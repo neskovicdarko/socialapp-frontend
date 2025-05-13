@@ -1,19 +1,20 @@
-import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
-import api from './api';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+import HomeScreen from './screens/HomeScreen';
 
-const App = () => {
-  useEffect(() => {
-    api.get('/ping')
-      .then((res: { data: string; }) => console.log('PingpongSuccess', res.data))
-      .catch((err: { message: string; }) => console.log('PingpongError', err.message));
-  }, []);
+const Stack = createNativeStackNavigator();
 
-  return (
-    <View>
-      <Text>Ping Test</Text>
-    </View>
-  );
-};
+const App = () => (
+  <NavigationContainer>
+    <Stack.Navigator initialRouteName="Login">
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="Home" component={HomeScreen} />
+    </Stack.Navigator>
+  </NavigationContainer>
+);
 
 export default App;
