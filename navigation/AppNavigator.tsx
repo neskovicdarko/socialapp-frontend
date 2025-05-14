@@ -13,31 +13,38 @@ import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
 
-export default function AppNavigator({ navigation }) {
+const icons = {
+  Home: "home",
+  Map: "map-marked-alt",
+  Create: "plus-circle",
+  Events: "calendar-alt",
+  Chat: "comments",
+} as const;
+
+type TabRouteName = keyof typeof icons; // "Home" | "Map" | ...
+
+export default function AppNavigator({ navigation }: any) {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          const icons = {
-            Home: "home",
-            Map: "map-marked-alt",
-            Create: "plus-circle",
-            Events: "calendar-alt",
-            Chat: "comments",
-          };
-          return <Icon name={icons[route.name]} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "green",
-        tabBarInactiveTintColor: "gray",
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate("Profile")}
-            style={{ marginRight: 16 }}
-          >
-            <Icon name="user" size={20} color="gray" />
-          </TouchableOpacity>
-        ),
-      })}
+      screenOptions={({ route }) => {
+        const routeName = route.name as TabRouteName;
+
+        return {
+          tabBarIcon: ({ color, size }) => (
+            <Icon name={icons[routeName]} size={size} color={color} />
+          ),
+          tabBarActiveTintColor: "green",
+          tabBarInactiveTintColor: "gray",
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Profile")}
+              style={{ marginRight: 16 }}
+            >
+              <Icon name="user" size={20} color="gray" />
+            </TouchableOpacity>
+          ),
+        };
+      }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Map" component={MapScreen} />

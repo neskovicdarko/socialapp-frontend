@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome5";
 
-export default function ProfileScreen({ navigation }) {
+export default function ProfileScreen({ navigation }: any) {
   const handleLogout = () => {
     // Replace with real logout logic
     navigation.replace("Login");

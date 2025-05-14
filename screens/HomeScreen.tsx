@@ -1,39 +1,51 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+} from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome5";
 
+type TabKey = "home" | "map" | "create" | "events" | "chat";
+
+const screenTitleMap: Record<TabKey, string> = {
+  home: "Home",
+  map: "Map",
+  create: "Create Event",
+  events: "Events",
+  chat: "Chat",
+};
+
+const tabs: { key: TabKey; icon: string; label: string }[] = [
+  { key: "home", icon: "home", label: "Home" },
+  { key: "map", icon: "map-marked-alt", label: "Map" },
+  { key: "create", icon: "plus-circle", label: "Create" },
+  { key: "events", icon: "calendar-alt", label: "Events" },
+  { key: "chat", icon: "comments", label: "Chat" },
+];
+
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState("home");
-
-  const tabs = [
-    { key: "home", icon: "home", label: "Home" },
-    { key: "map", icon: "map-marked-alt", label: "Map" },
-    { key: "create", icon: "plus-circle", label: "Create" },
-    { key: "events", icon: "calendar-alt", label: "Event" },
-    { key: "chat", icon: "comments", label: "Chat" },
-  ];
-
-  const screenTitleMap = {
-    home: "Home",
-    map: "Map",
-    create: "Create Event",
-    events: "Events",
-    chat: "Chat",
-    profile: "Profile",
-  };
+  const [activeTab, setActiveTab] = useState<TabKey>("home");
 
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }}>
+      {/* Header /}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{screenTitleMap[activeTab]}</Text>
+        <TouchableOpacity style={styles.profileButton}>
+          <Icon name="user" size={20} color="gray" />
+        </TouchableOpacity>
+      </View>
 
-      {/* Main Content */}
+      {/ Main Content */}
       <View style={styles.content}>
         <Text style={{ fontSize: 24 }}>
           Welcome to {screenTitleMap[activeTab]} Screen
         </Text>
       </View>
-
-      
-    </View>
+    </SafeAreaView>
   );
 }
 
