@@ -11,7 +11,7 @@ export default function LoginScreen({ navigation }: any) {
     try {
       const res = await api.post('/login', { email, password });
       await AsyncStorage.setItem('token', res.data.token);
-      navigation.replace('Home');
+      navigation.replace('MainApp');
     } catch (err: any) {
       Alert.alert('Login failed', err.response?.data?.message || 'Unknown error');
     }
