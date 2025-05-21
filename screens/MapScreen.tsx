@@ -1,22 +1,30 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import MapboxGL from "@rnmapbox/maps";
 
 export default function MapScreen() {
+  
+  const belgradeCoords = [20.457273, 44.787197]; // [longitude, latitude]
+
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Map screen placeholder</Text>
-      {/* MapView component can be added here later */}
+      <MapboxGL.MapView style={styles.map}>
+        <MapboxGL.Camera
+          zoomLevel={12}
+          centerCoordinate={belgradeCoords}
+        />
+        <MapboxGL.PointAnnotation coordinate={belgradeCoords} id="belgrade" />
+      </MapboxGL.MapView>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
-  text: {
-    fontSize: 22,
+  map: {
+    flex: 1,
   },
 });
