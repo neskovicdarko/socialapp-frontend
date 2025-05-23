@@ -7,6 +7,7 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AppNavigator from './navigation/AppNavigator'; // tab-based app
+import RootNavigator from './navigation/RootNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,7 +18,7 @@ const App = () => (
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen
         name="MainApp"
-        component={AppNavigator}
+        component={RootNavigator}
         options={{ headerShown: false }} // hide stack header for tab navigation
       />
       <Stack.Screen name="Profile" component={ProfileScreen} />
