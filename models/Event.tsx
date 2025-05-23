@@ -1,16 +1,14 @@
-export interface Profile {
-  first_name: string;
-  last_name: string;
-  description?: string;
-  date_of_birth?: string;
-  rating: number;
-  number_of_ratings: number;
-  profile_photo?: string;
-}
+import { User } from "./User";
 
-export interface User {
+export interface Event {
   id: number;
-  name: string;
-  email: string;
-  profile: Profile;
+  title: string;
+  description?: string;
+  starts_at: string;
+  ends_at?: string;
+  location?: string;
+  owner_id: number;
+  created_at?: string;
+  updated_at?: string;
+  owner: User; 
 }
