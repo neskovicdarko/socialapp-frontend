@@ -1,108 +1,126 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
   View,
+  StyleSheet,
   PermissionsAndroid,
   Platform,
   TouchableOpacity,
   Text,
+  Alert,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import MapView, {
+  Marker,
+  PROVIDER_GOOGLE,
+  LatLng,
+  Region,
+} from "react-native-maps";
 import Geolocation from "@react-native-community/geolocation";
 
 export default function MapScreen() {
-  const [region, setRegion] = useState<Region>({
-    latitude: 44.7866,
-    longitude: 20.4489,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
-
-  const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [marker, setMarker] = useState<LatLng | null>(null);
   const mapRef = useRef<MapView>(null);
 
+  // Ask for location permission and get initial user location
   useEffect(() => {
-    const requestLocationPermission = async () => {
-      if (Platform.OS === "android") {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        );
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          locateUser();
+    const requestPermissionAndTrack = async () => {
+      try {
+        if (Platform.OS === "android") {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert("Permission denied", "Cannot access location.");
+            return;
+          }
         }
-      } else {
-        locateUser();
-      }
+
+        Geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const coords = { latitude, longitude };
+            setUserLocation(coords);
+            centerMapOn(coords);
+          },
+          (error) => Alert.alert("Location error", error.message),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      } catch (err) {
+          if (err instanceof Error) {
+            Alert.alert("Error requesting location permission", err.message);
+          } else {
+            Alert.alert("Unknown error occurred");
+          }
+        }
     };
 
-    const locateUser = () => {
-      Geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          const newRegion = {
-            latitude,
-            longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          };
-          setRegion(newRegion);
-          mapRef.current?.animateToRegion(newRegion, 1000);
-        },
-        error => console.warn(error.message),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-      );
-    };
-
-    requestLocationPermission();
+    requestPermissionAndTrack();
   }, []);
+
+  const centerMapOn = (coords: LatLng) => {
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          ...coords,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        1000
+      );
+    }
+  };
 
   const handleMapPress = (e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarker({ latitude, longitude });
   };
 
-  const zoomDelta = 0.01;
-
-  const zoomIn = () => {
-    const newRegion = {
-      ...region,
-      latitudeDelta: region.latitudeDelta - zoomDelta,
-      longitudeDelta: region.longitudeDelta - zoomDelta,
-    };
-    setRegion(newRegion);
-    mapRef.current?.animateToRegion(newRegion, 300);
+  const zoom = async (direction: "in" | "out") => {
+    const camera = await mapRef.current?.getCamera();
+    if (camera) {
+      const zoomAmount = direction === "in" ? 1 : -1;
+      if (camera.zoom !== undefined) {
+        camera.zoom += zoomAmount;
+        mapRef.current?.animateCamera(camera, { duration: 300 });
+      }
+    }
   };
 
-  const zoomOut = () => {
-    const newRegion = {
-      ...region,
-      latitudeDelta: region.latitudeDelta + zoomDelta,
-      longitudeDelta: region.longitudeDelta + zoomDelta,
-    };
-    setRegion(newRegion);
-    mapRef.current?.animateToRegion(newRegion, 300);
+  const centerOnUser = () => {
+    if (userLocation) centerMapOn(userLocation);
   };
 
   return (
     <View style={styles.container}>
       <MapView
         ref={mapRef}
+        style={StyleSheet.absoluteFillObject}
         provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        region={region}
-        onPress={handleMapPress}
         showsUserLocation={true}
-        showsMyLocationButton={true}
+        showsMyLocationButton={false}
+        onPress={handleMapPress}
+        initialRegion={{
+          latitude: 44.7866,
+          longitude: 20.4489,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
       >
         {marker && <Marker coordinate={marker} />}
       </MapView>
 
+      {/* Center on user */}
+      <TouchableOpacity onPress={centerOnUser} style={styles.centerButton}>
+        <Text style={styles.buttonText}>🎯</Text>
+      </TouchableOpacity>
+
+      {/* Zoom buttons */}
       <View style={styles.zoomControls}>
-        <TouchableOpacity onPress={zoomIn} style={styles.zoomButton}>
-          <Text style={styles.zoomText}>+</Text>
+        <TouchableOpacity onPress={() => zoom("in")} style={styles.zoomButton}>
+          <Text style={styles.buttonText}>＋</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={zoomOut} style={styles.zoomButton}>
-          <Text style={styles.zoomText}>−</Text>
+        <TouchableOpacity onPress={() => zoom("out")} style={styles.zoomButton}>
+          <Text style={styles.buttonText}>−</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -110,30 +128,35 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  container: { flex: 1 },
   zoomControls: {
     position: "absolute",
     bottom: 30,
     right: 20,
-    flexDirection: "column",
   },
   zoomButton: {
-    backgroundColor: "#fff",
+    backgroundColor: "white",
     borderRadius: 25,
     width: 50,
     height: 50,
     marginBottom: 10,
-    alignItems: "center",
     justifyContent: "center",
-    elevation: 5,
+    alignItems: "center",
+    elevation: 4,
   },
-  zoomText: {
-    fontSize: 24,
-    fontWeight: "bold",
+  centerButton: {
+    position: "absolute",
+    bottom: 180,
+    right: 20,
+    backgroundColor: "white",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+  },
+  buttonText: {
+    fontSize: 22,
   },
 });
