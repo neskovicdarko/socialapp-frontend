@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Alert } from 'react-native';
 import api from '../api';
+import { useLoading } from '../context/LoadingContext';
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { setLoading } = useLoading();
 
   const register = async () => {
+    setLoading(true);
     try {
       await api.post('/register', {
         name,
@@ -19,6 +22,8 @@ export default function RegisterScreen({ navigation }: any) {
       navigation.navigate('Login');
     } catch (err: any) {
       Alert.alert('Registration failed', err.response?.data?.message || 'Unknown error');
+    } finally {
+      setLoading(false);
     }
   };
 
