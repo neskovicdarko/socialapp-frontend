@@ -7,9 +7,10 @@ import { TouchableOpacity } from "react-native";
 import HomeScreen from "../screens/HomeScreen";
 import MapScreen from "../screens/MapScreen";
 import CreateScreen from "../screens/CreateScreen";
-import EventScreen from "../screens/EventScreen";
+import EventScreen from "../screens/ExploreEventsScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import EventsTabs from "../screens/EventsTabs";
 
 const Tab = createBottomTabNavigator();
 
@@ -33,7 +34,7 @@ export default function AppNavigator({ navigation }: any) {
           tabBarIcon: ({ color, size }) => (
             <Icon name={icons[routeName]} size={size} color={color} />
           ),
-          tabBarActiveTintColor: "green",
+          tabBarActiveTintColor: "#00796B",
           tabBarInactiveTintColor: "gray",
           headerRight: () => (
             <TouchableOpacity
@@ -49,7 +50,7 @@ export default function AppNavigator({ navigation }: any) {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Create" component={CreateScreen} />
-      <Tab.Screen name="Events" component={EventScreen} />
+      <Tab.Screen name="Events" component={EventsTabs} />
       <Tab.Screen name="Chat" component={ChatScreen} />
     </Tab.Navigator>
   );

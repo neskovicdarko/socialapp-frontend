@@ -12,6 +12,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { Event } from "../models/Event";
 import api from "../api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AxiosError } from "axios";
 
 type EventDetailRouteProp = RouteProp<RootStackParamList, "EventDetail">;
@@ -28,10 +29,23 @@ export default function EventDetailScreen({
   const [isApplied, setIsApplied] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     checkIfApplied();
+    checkIfOwner();
   }, []);
+
+  const checkIfOwner = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("user_id");
+      if (userId && userId === event.owner.id.toString()) {
+        setIsOwner(true);
+      }
+    } catch (err) {
+      console.error("Owner check failed", err);
+    }
+  };
 
   const checkIfApplied = async () => {
     try {
@@ -95,7 +109,9 @@ export default function EventDetailScreen({
       </Text>
 
       <TouchableOpacity
-        onPress={() => navigation.navigate("EventDetailProfile", { user: event.owner })}
+        onPress={() =>
+          navigation.navigate("EventDetailProfile", { user: event.owner })
+        }
         style={styles.profileCTA}
       >
         <Text style={styles.profileCTAText}>
@@ -104,22 +120,31 @@ export default function EventDetailScreen({
         </Text>
       </TouchableOpacity>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="blue" style={{ marginTop: 20 }} />
-      ) : (
-        <TouchableOpacity
-          style={[styles.actionButton, isApplied ? styles.revoke : styles.apply]}
-          onPress={() => (isApplied ? revokeApplication() : applyToEvent())}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isApplied ? "REVOKE" : "APPLY"}
-            </Text>
-          )}
-        </TouchableOpacity>
+      {!isOwner && (
+        loading ? (
+          <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 20 }} />
+        ) : (
+          <View style={{ marginTop: 24 }}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                isApplied ? styles.revoke : styles.apply,
+              ]}
+              onPress={() =>
+                isApplied ? revokeApplication() : applyToEvent()
+              }
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isApplied ? "REVOKE" : "APPLY"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )
       )}
     </ScrollView>
   );
@@ -133,12 +158,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 16,
+    color: "#222",
   },
   label: {
     fontSize: 16,
     fontWeight: "500",
-    marginTop: 12,
+    marginTop: 16,
+    color: "#555",
   },
   value: {
     fontSize: 15,
@@ -146,13 +173,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   actionButton: {
-    marginTop: 24,
     paddingVertical: 12,
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: 8,
+    width: "100%",
   },
   apply: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#00796B",
   },
   revoke: {
     backgroundColor: "#dc3545",
@@ -163,11 +190,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   profileCTA: {
-    marginTop: 24,
-    paddingVertical: 10,
+    marginTop: 28,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: "#007bff",
-    borderRadius: 6,
+    backgroundColor: "#00796B",
+    borderRadius: 8,
     alignItems: "center",
   },
   profileCTAText: {

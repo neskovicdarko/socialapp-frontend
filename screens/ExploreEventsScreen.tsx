@@ -111,17 +111,13 @@ export default function EventScreen() {
 
         <TouchableOpacity
           style={[styles.actionButton, isApplied ? styles.revoke : styles.apply]}
-          onPress={() =>
-            isApplied ? revokeApplication(item.id) : applyToEvent(item.id)
-          }
+          onPress={() => (isApplied ? revokeApplication(item.id) : applyToEvent(item.id))}
           disabled={isSubmitting}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>
-              {isApplied ? "REVOKE" : "APPLY"}
-            </Text>
+            <Text style={styles.buttonText}>{isApplied ? "REVOKE" : "APPLY"}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -135,9 +131,10 @@ export default function EventScreen() {
         value={query}
         onChangeText={setQuery}
         style={styles.searchInput}
+        placeholderTextColor="#888"
       />
       {loading ? (
-        <ActivityIndicator size="large" color="blue" />
+        <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />
       ) : (
         <FlatList
           data={events}
@@ -157,42 +154,52 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   searchInput: {
-    height: 40,
+    height: 44,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    fontSize: 16,
+    color: "#333",
   },
   eventCard: {
-    backgroundColor: "#f1f1f1",
-    borderRadius: 8,
+    backgroundColor: "#f8f8f8",
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 12,
-    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   eventTitle: {
     fontSize: 18,
-    fontWeight: "500",
-    marginBottom: 4,
+    fontWeight: "600",
+    marginBottom: 6,
+    color: "#222",
   },
   eventDetail: {
     fontSize: 14,
-    color: "gray",
+    color: "#666",
     marginBottom: 2,
   },
   actionButton: {
+    marginTop: 10,
     paddingVertical: 12,
+    borderRadius: 8,
     alignItems: "center",
   },
   apply: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#00796B",
   },
   revoke: {
     backgroundColor: "#dc3545",
   },
   buttonText: {
     color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
+    fontWeight: "600",
+    fontSize: 15,
   },
 });
