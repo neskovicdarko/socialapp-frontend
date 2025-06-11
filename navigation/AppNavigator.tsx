@@ -7,9 +7,7 @@ import { TouchableOpacity } from "react-native";
 import HomeScreen from "../screens/HomeScreen";
 import MapScreen from "../screens/MapScreen";
 import CreateScreen from "../screens/CreateScreen";
-import EventScreen from "../screens/ExploreEventsScreen";
 import ChatScreen from "../screens/ChatScreen";
-import ProfileScreen from "../screens/ProfileScreen";
 import EventsTabs from "../screens/EventsTabs";
 
 const Tab = createBottomTabNavigator();
@@ -38,12 +36,14 @@ export default function AppNavigator({ navigation }: any) {
           tabBarInactiveTintColor: "gray",
           headerRight: () => (
             <TouchableOpacity
-              onPress={() => navigation.navigate("Profile")}
+              onPress={() =>
+                navigation.navigate("ProfileStack", { screen: "ProfileMain" })
+              }
               style={{ marginRight: 16 }}
             >
               <Icon name="user" size={20} color="gray" />
             </TouchableOpacity>
-          ),
+          )
         };
       }}
     >
