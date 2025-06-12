@@ -30,12 +30,18 @@ export default function CreateScreen() {
       timeObj.getHours(),
       timeObj.getMinutes()
     );
-
     return combined.toISOString().replace("T", " ").substring(0, 19);
   };
 
   const handleCreate = async () => {
     const startsAt = formatToMysqlDatetime(startDate, startTime);
+    const now = new Date();
+
+    const eventDate = new Date(startsAt);
+    if (eventDate <= now) {
+      Alert.alert("Invalid Time", "Event must be set in the future.");
+      return;
+    }
 
     try {
       await api.post("/events", {
@@ -46,7 +52,6 @@ export default function CreateScreen() {
       });
 
       Alert.alert("Success", "Event created successfully!");
-      // Optionally reset form here
     } catch (error: any) {
       console.error("Create error:", error.response || error.message);
       Alert.alert("Error", error.response?.data?.message || "Something went wrong.");
@@ -57,12 +62,7 @@ export default function CreateScreen() {
     <View style={styles.container}>
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Title</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Event title"
-        />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} />
       </View>
 
       <View style={styles.inputGroup}>
@@ -71,19 +71,13 @@ export default function CreateScreen() {
           style={styles.input}
           value={description}
           onChangeText={setDescription}
-          placeholder="Event description"
           multiline
         />
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Location</Text>
-        <TextInput
-          style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Event location"
-        />
+        <TextInput style={styles.input} value={location} onChangeText={setLocation} />
       </View>
 
       <View style={styles.inputGroup}>
@@ -95,6 +89,7 @@ export default function CreateScreen() {
           <DateTimePicker
             value={startDate}
             mode="date"
+            minimumDate={new Date()}
             display={Platform.OS === "ios" ? "spinner" : "default"}
             onChange={(event, selectedDate) => {
               setShowDatePicker(false);
@@ -116,6 +111,7 @@ export default function CreateScreen() {
             value={startTime}
             mode="time"
             is24Hour={true}
+            minimumDate={new Date()}
             display={Platform.OS === "ios" ? "spinner" : "default"}
             onChange={(event, selectedTime) => {
               setShowTimePicker(false);
@@ -133,19 +129,9 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    backgroundColor: "#fff",
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  label: {
-    fontWeight: "600",
-    marginBottom: 4,
-    color: "#333",
-  },
+  container: { flex: 1, padding: 24, backgroundColor: "#fff" },
+  inputGroup: { marginBottom: 12 },
+  label: { fontWeight: "600", marginBottom: 4, color: "#333" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -161,9 +147,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });
