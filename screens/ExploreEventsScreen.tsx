@@ -22,6 +22,7 @@ export default function EventScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [appliedIds, setAppliedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
 
@@ -58,6 +59,17 @@ export default function EventScreen() {
       setAppliedIds(response.data.map((event) => event.id));
     } catch (err) {
       console.error("Failed to load applications");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchEvents(), fetchMyApplications()]);
+    } catch (err) {
+      console.error("Refresh failed", err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -141,6 +153,8 @@ export default function EventScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={{ paddingBottom: 20 }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
     </View>

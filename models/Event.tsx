@@ -10,5 +10,8 @@ export interface Event {
   owner_id: number;
   created_at?: string;
   updated_at?: string;
-  owner: User; 
+  owner: User;
+  pivot?: {
+    status: number; // 0: Pending, 1: Accepted, 2: Rejected
+  };
 }

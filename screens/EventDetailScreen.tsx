@@ -3,148 +3,171 @@ import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
-import { RouteProp, useNavigation } from "@react-navigation/native";
+import { useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { Event } from "../models/Event";
+import { User } from "../models/User";
 import api from "../api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AxiosError } from "axios";
+
+// Types
 
 type EventDetailRouteProp = RouteProp<RootStackParamList, "EventDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type UserWithStatus = User & { pivot: { status: number } };
 
-export default function EventDetailScreen({
-  route,
-}: {
-  route: EventDetailRouteProp;
-}) {
+export default function EventDetailScreen({ route }: { route: EventDetailRouteProp }) {
   const { event } = route.params;
   const navigation = useNavigation<NavigationProp>();
 
-  const [isApplied, setIsApplied] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [applications, setApplications] = useState<UserWithStatus[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+  const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    checkIfApplied();
-    checkIfOwner();
+    const loadUserId = async () => {
+      const storedId = await AsyncStorage.getItem("user_id");
+      if (storedId) setUserId(parseInt(storedId));
+    };
+
+    loadUserId();
   }, []);
 
-  const checkIfOwner = async () => {
+  useEffect(() => {
+    if (userId !== null && event.owner_id === userId) {
+      fetchApplications();
+    }
+  }, [userId]);
+
+  const fetchApplications = async () => {
     try {
-      const userId = await AsyncStorage.getItem("user_id");
-      if (userId && userId === event.owner.id.toString()) {
-        setIsOwner(true);
-      }
+      setLoadingApplications(true);
+      const res = await api.get(`/applications`, {
+        params: { event_id: event.id },
+      });
+      setApplications(res.data.applications);
     } catch (err) {
-      console.error("Owner check failed", err);
+      console.error("Failed to load applications", err);
+    } finally {
+      setLoadingApplications(false);
     }
   };
 
-  const checkIfApplied = async () => {
+  const handleDecision = async (userId: number, status: number) => {
+    setSubmittingIds((prev) => new Set(prev).add(userId));
     try {
-      const response = await api.get<Event[]>("/applications/mine");
-      const appliedIds = response.data.map((e) => e.id);
-      setIsApplied(appliedIds.includes(event.id));
+      await api.put(`/events/${event.id}/users/${userId}`, { status });
+      fetchApplications();
     } catch (err) {
-      console.error("Check applied failed", err);
-      setIsApplied(false);
+      console.error("Failed to update status", err);
     } finally {
-      setLoading(false);
+      setSubmittingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
-  const applyToEvent = async () => {
-    setSubmitting(true);
-    try {
-      await api.post(`/events/${event.id}/apply`);
-      setIsApplied(true);
-    } catch (err) {
-      const error = err as AxiosError;
-      console.error("Apply failed", error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const revokeApplication = async () => {
-    setSubmitting(true);
-    try {
-      await api.delete(`/events/${event.id}/revoke`);
-      setIsApplied(false);
-    } catch (err) {
-      const error = err as AxiosError;
-      console.error("Revoke failed", error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  if (userId === null) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{event.title}</Text>
+      <Text style={styles.detail}>{event.starts_at}</Text>
+      <Text style={styles.detail}>{event.location}</Text>
+      <Text style={styles.description}>{event.description}</Text>
 
-      <Text style={styles.label}>Date:</Text>
-      <Text style={styles.value}>{event.starts_at}</Text>
-
-      {event.ends_at && (
-        <>
-          <Text style={styles.label}>Ends:</Text>
-          <Text style={styles.value}>{event.ends_at}</Text>
-        </>
+      {event.owner_id !== userId && (
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate("EventDetailProfile", { user: event.owner })
+          }
+          style={styles.profileCTA}
+        >
+          <Text style={styles.profileCTAText}>
+            View Host: {event.owner.profile.first_name} {event.owner.profile.last_name}
+          </Text>
+        </TouchableOpacity>
       )}
 
-      <Text style={styles.label}>Location:</Text>
-      <Text style={styles.value}>{event.location || "N/A"}</Text>
+      {event.owner_id === userId && (
+        <View style={{ marginTop: 20 }}>
+          <Text style={styles.sectionTitle}>Applications</Text>
+          {loadingApplications ? (
+            <ActivityIndicator />
+          ) : applications.length === 0 ? (
+            <Text style={styles.noApps}>No applications yet.</Text>
+          ) : (
+            applications.map((applicant) => {
+              const isSubmitting = submittingIds.has(applicant.id);
+              const profile = applicant.profile ?? {};
+              const status = applicant.pivot.status;
+              const backgroundColor =
+                status === 1 ? "#e6f4ea" : status === 2 ? "#fbeaea" : "#f4f4f4";
 
-      <Text style={styles.label}>Description:</Text>
-      <Text style={styles.value}>
-        {event.description || "No description provided."}
-      </Text>
+              return (
+                <TouchableOpacity
+                  key={applicant.id}
+                  onPress={() => navigation.navigate("EventDetailProfile", { user: applicant })}
+                  style={[styles.applicantCard, { backgroundColor }]}
+                  disabled={isSubmitting}
+                >
+                  <View style={styles.applicantInfo}>
+                    <Text style={styles.applicantName}>
+                      {profile.first_name ?? "Unknown"} {profile.last_name ?? ""}
+                    </Text>
+                    <Text style={styles.applicantStatus}>
+                      Status: {["Pending", "Accepted", "Rejected"][status]}
+                    </Text>
+                  </View>
 
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate("EventDetailProfile", { user: event.owner })
-        }
-        style={styles.profileCTA}
-      >
-        <Text style={styles.profileCTAText}>
-          View Host: {event.owner.profile.first_name}{" "}
-          {event.owner.profile.last_name}
-        </Text>
-      </TouchableOpacity>
-
-      {!isOwner && (
-        loading ? (
-          <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 20 }} />
-        ) : (
-          <View style={{ marginTop: 24 }}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                isApplied ? styles.revoke : styles.apply,
-              ]}
-              onPress={() =>
-                isApplied ? revokeApplication() : applyToEvent()
-              }
-              disabled={submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isApplied ? "REVOKE" : "APPLY"}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )
+                  <View style={styles.actionRow}>
+                    {(status === 0 || status === 2) && (
+                      <TouchableOpacity
+                        onPress={() => handleDecision(applicant.id, 1)}
+                        style={[styles.acceptBtn, isSubmitting && styles.disabledBtn]}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.btnText}>Accept</Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    {(status === 0 || status === 1) && (
+                      <TouchableOpacity
+                        onPress={() => handleDecision(applicant.id, 2)}
+                        style={[styles.rejectBtn, isSubmitting && styles.disabledBtn]}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.btnText}>Decline</Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
       )}
     </ScrollView>
   );
@@ -152,42 +175,73 @@ export default function EventDetailScreen({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: 20,
     backgroundColor: "#fff",
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "600",
-    marginBottom: 16,
-    color: "#222",
+    marginBottom: 8,
   },
-  label: {
+  detail: {
     fontSize: 16,
-    fontWeight: "500",
-    marginTop: 16,
-    color: "#555",
+    color: "#666",
+    marginBottom: 4,
   },
-  value: {
+  description: {
     fontSize: 15,
+    marginTop: 12,
     color: "#333",
-    marginTop: 4,
   },
-  actionButton: {
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 8,
-    width: "100%",
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 10,
   },
-  apply: {
-    backgroundColor: "#00796B",
+  noApps: {
+    color: "#888",
+    fontStyle: "italic",
   },
-  revoke: {
-    backgroundColor: "#dc3545",
+  applicantCard: {
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "700",
+  applicantInfo: {
+    marginBottom: 8,
+  },
+  applicantName: {
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  applicantStatus: {
+    color: "#666",
     fontSize: 14,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  acceptBtn: {
+    backgroundColor: "#4CAF50",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  rejectBtn: {
+    backgroundColor: "#f44336",
+    padding: 8,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: "center",
+  },
+  disabledBtn: {
+    opacity: 0.6,
+  },
+  btnText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   profileCTA: {
     marginTop: 28,

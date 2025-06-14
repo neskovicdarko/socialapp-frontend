@@ -1,26 +1,45 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+} from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/RootNavigator";
-import { User } from "../models/User";
+
+const BASE_URL = "http://10.0.2.2:8000";
 
 type ProfileRouteProp = RouteProp<RootStackParamList, "EventDetailProfile">;
 
 export default function EventDetailProfileScreen({ route }: { route: ProfileRouteProp }) {
   const { user } = route.params;
+  const profile = user.profile;
+  const rawPhoto = profile?.profile_photo;
+
+  const profilePhotoUri =
+    rawPhoto?.startsWith("http")
+      ? rawPhoto
+      : rawPhoto
+      ? `${BASE_URL}${rawPhoto}`
+      : null;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {user.profile.profile_photo && (
-        <Image source={{ uri: user.profile.profile_photo }} style={styles.avatar} />
-      )}
+      <Image
+        source={profilePhotoUri ? { uri: profilePhotoUri } : require("../assets/default-avatar.png")}
+        style={styles.avatar}
+        resizeMode="cover"
+        onError={() => console.warn("Failed to load avatar")}
+      />
       <Text style={styles.name}>
-        {user.profile.first_name} {user.profile.last_name}
+        {profile.first_name} {profile.last_name}
       </Text>
       <Text style={styles.rating}>
-        ⭐ {user.profile.rating.toFixed(1)} ({user.profile.number_of_ratings} ratings)
+        ⭐ {profile.rating?.toFixed(1) || "N/A"} ({profile.number_of_ratings} ratings)
       </Text>
-      <Text style={styles.bio}>{user.profile.description || "No bio provided."}</Text>
+      <Text style={styles.bio}>{profile.description || "No bio provided."}</Text>
     </ScrollView>
   );
 }
@@ -29,6 +48,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     padding: 20,
+    backgroundColor: "#fff",
   },
   avatar: {
     width: 100,
