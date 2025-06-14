@@ -21,7 +21,7 @@ export default function ChangePasswordScreen({ navigation }: any) {
     }
 
     try {
-      await api.post("/api/change-password", {
+      await api.post("/change-password", {
         current_password: currentPassword,
         new_password: newPassword,
         new_password_confirmation: confirmPassword,

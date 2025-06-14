@@ -7,49 +7,40 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ScrollView,
 } from "react-native";
 import { launchImageLibrary } from "react-native-image-picker";
 import api from "../api";
 import { User } from "../models/User";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLoading } from '../context/LoadingContext';
+import { useLoading } from "../context/LoadingContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const BASE_URL = "http://10.0.2.2:8000"; //TODO
+import DateTimePicker from "@react-native-community/datetimepicker";
+import Icon from "react-native-vector-icons/FontAwesome5";
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<User | null>(null);
   const [form, setForm] = useState<Partial<User["profile"]>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const { setLoading } = useLoading();
-  
-  const handleLogout = () => {
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Yes",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.post("/logout");
-            } catch (err) {
-              // ignoriši backend grešku, idemo dalje
-            } finally {
-              await AsyncStorage.removeItem("token");
-              navigation.replace("Login");
-            }
-          },
-        },
-      ]
-    );
-  };
 
+  const handleLogout = () => {
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Yes",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.post("/logout");
+          } catch {}
+          await AsyncStorage.removeItem("token");
+          navigation.replace("Login");
+        },
+      },
+    ]);
+  };
 
   const fetchUser = async () => {
     try {
@@ -87,17 +78,18 @@ export default function ProfileScreen({ navigation }: any) {
         const res = await api.post("/profile/photo", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        setUser((prev) => prev
-          ? {
-              ...prev,
-              profile: {
-                ...prev.profile,
-                profile_photo: `${BASE_URL}${res.data.profile_photo}`,
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                profile: {
+                  ...prev.profile,
+                  profile_photo: res.data.profile_photo,
+                },
               }
-            }
-          : null
+            : null
         );
-      } catch (error) {
+      } catch {
         Alert.alert("Error", "Failed to upload image.");
       }
     });
@@ -112,143 +104,162 @@ export default function ProfileScreen({ navigation }: any) {
       setUser(res.data);
       setForm(res.data.profile);
       setIsEditing(false);
-      console.log("Profile updated:", res.data);
     } catch (error: any) {
       console.error("Profile update failed", error.response?.data);
       Alert.alert("Error", error.response?.data?.message || "Failed to update profile.");
     }
   };
 
+  const formatDateLocalized = (dateStr?: string) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString("sr-RS", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
   if (!user || !user.profile) return null;
-
   const profile = user.profile;
-
-  const profilePhotoUri =
-    profile?.profile_photo?.startsWith("http")
-      ? profile.profile_photo
-      : profile?.profile_photo
-      ? `${BASE_URL}${profile.profile_photo}`
-      : undefined;
 
   return (
     <View style={styles.container}>
-      <View style={styles.avatarContainer}>
-        <Image
-          source={
-            profile?.profile_photo
-              ? { uri: profile.profile_photo }
-              : require("../assets/default-avatar.png")
-          }
-          onError={() =>
-            setUser(prev =>
-              prev
-                ? {
-                    ...prev,
-                    profile: {
-                      ...prev.profile,
-                      profile_photo: undefined,
-                    },
-                  }
-                : null
-            )
-          }
-          style={styles.avatar}
-        />
-        <TouchableOpacity style={styles.editAvatar} onPress={handleImageUpload}>
-          <Text style={styles.editAvatarText}>✏️</Text>
-        </TouchableOpacity>
-      </View>
-
-      {[
-        { key: "first_name", label: "First Name" },
-        { key: "last_name", label: "Last Name" },
-        { key: "description", label: "Description" },
-        { key: "date_of_birth", label: "Date of Birth" },
-      ].map(({ key, label }) => (
-        <View key={key} style={styles.inputGroup}>
-          <Text style={styles.label}>{label}</Text>
-          <TextInput
-            style={styles.input}
-            editable={isEditing}
-            value={(form as any)[key]}
-            onChangeText={(val) => setForm({ ...form, [key]: val })}
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.avatarContainer}>
+          <Image
+            source={
+              profile?.profile_photo
+                ? { uri: profile.profile_photo }
+                : require("../assets/default-avatar.png")
+            }
+            style={styles.avatar}
           />
+          <TouchableOpacity style={styles.avatarEditIcon} onPress={handleImageUpload}>
+            <Icon name="camera" size={16} color="#00796B" />
+          </TouchableOpacity>
         </View>
-      ))}
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: "#f0f0f0" }]}
-          editable={false}
-          value={user.email}
-        />
+        <View style={styles.centeredInfo}>
+          <Text style={styles.name}>
+            {profile.first_name} {profile.last_name}
+          </Text>
+          <Text style={styles.infoText}>{formatDateLocalized(profile.date_of_birth)}</Text>
+          <Text style={styles.infoText}>{user.email}</Text>
+          {profile.description ? (
+            <Text style={styles.description}>{profile.description}</Text>
+          ) : null}
+          <View style={styles.ratingRow}>
+            <Text style={styles.ratingText}>
+              {profile.rating?.toFixed(1)} ⭐ ({profile.number_of_ratings})
+            </Text>
+          </View>
+        </View>
+
+        {isEditing && (
+          <View style={styles.editSection}>
+            {["first_name", "last_name", "description"].map((key) => (
+              <View key={key} style={styles.inputGroup}>
+                <Text style={styles.label}>{key.replace("_", " ")}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={(form as any)[key]}
+                  onChangeText={(val) => setForm({ ...form, [key]: val })}
+                />
+              </View>
+            ))}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Date of Birth</Text>
+              <TouchableOpacity
+                style={[styles.input, { justifyContent: "center" }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text>{formatDateLocalized(form.date_of_birth)}</Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={
+                    form.date_of_birth
+                      ? new Date(form.date_of_birth)
+                      : new Date("2000-01-01")
+                  }
+                  mode="date"
+                  display="default"
+                  maximumDate={new Date()}
+                  onChange={(e, date) => {
+                    setShowDatePicker(false);
+                    if (date) {
+                      setForm({
+                        ...form,
+                        date_of_birth: date.toISOString().split("T")[0],
+                      });
+                    }
+                  }}
+                />
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={isEditing ? handleSave : () => setIsEditing(true)}
+        >
+          <Text style={styles.buttonText}>{isEditing ? "Save" : "Edit"}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate("ChangePassword")}
+        >
+          <Text style={styles.secondaryButtonText}>Change Password</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </View>
-
-      {isEditing ? (
-        <TouchableOpacity style={styles.button} onPress={handleSave}>
-          <Text style={styles.buttonText}>Save</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={() => setIsEditing(true)}>
-          <Text style={styles.buttonText}>Edit</Text>
-        </TouchableOpacity>
-      )}
-
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => navigation.navigate("ChangePassword")}
-      >
-        <Text style={styles.secondaryButtonText}>Change Password</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
-      </TouchableOpacity>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    backgroundColor: "#fff",
-  },
-  loading: {
-    marginTop: 100,
-    textAlign: "center",
-  },
-  avatarContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  editAvatar: {
+  container: { flex: 1, backgroundColor: "#fff" },
+  scroll: { padding: 24, paddingBottom: 40 },
+  avatarContainer: { alignItems: "center", marginBottom: 8 },
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  avatarEditIcon: {
     position: "absolute",
-    right: 110 / 2 - 20,
     bottom: 0,
+    right: "38%",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 4,
-    elevation: 3,
+    padding: 6,
+    borderRadius: 20,
+    elevation: 4,
   },
-  editAvatarText: {
-    fontSize: 14,
+  centeredInfo: { alignItems: "center", marginBottom: 20 },
+  name: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
+  infoText: { color: "#555", fontSize: 14, marginBottom: 2 },
+  description: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#444",
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
-  inputGroup: {
-    marginBottom: 12,
+  ratingRow: {
+    marginTop: 8,
+    backgroundColor: "#f3f3f3",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
-  label: {
-    fontWeight: "600",
-    marginBottom: 4,
-    color: "#333",
-  },
+  ratingText: { fontSize: 16, fontWeight: "600", color: "#333" },
+  editSection: { marginTop: 10 },
+  inputGroup: { marginBottom: 12 },
+  label: { fontWeight: "600", marginBottom: 4, color: "#333" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -256,18 +267,15 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 16,
   },
+  footer: { paddingHorizontal: 24, paddingBottom: 20, backgroundColor: "#fff" },
   button: {
     backgroundColor: "#00796B",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 10,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   secondaryButton: {
     marginTop: 10,
     padding: 12,
@@ -276,10 +284,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
-  secondaryButtonText: {
-    color: "#00796B",
-    fontWeight: "600",
-  },
+  secondaryButtonText: { color: "#00796B", fontWeight: "600" },
   logoutButton: {
     marginTop: 12,
     backgroundColor: "#e57373",
@@ -287,9 +292,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
-  logoutButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  logoutButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });
