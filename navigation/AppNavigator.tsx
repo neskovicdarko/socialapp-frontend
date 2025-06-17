@@ -12,7 +12,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import HomeScreen from "../screens/HomeScreen";
 import MapScreen from "../screens/MapScreen";
 import CreateScreen from "../screens/CreateScreen";
-import ChatScreen from "../screens/ChatScreen";
+import ChatEventListScreen from "../screens/ChatEventListScreen";
 import EventsTabs from "../screens/EventsTabs";
 
 const Tab = createBottomTabNavigator();
@@ -135,7 +135,7 @@ export default function AppNavigator({ navigation }: any) {
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen name="Events" component={EventsTabs} />
-      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="Chat" component={ChatEventListScreen} />
     </Tab.Navigator>
   );
 }

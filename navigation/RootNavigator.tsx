@@ -7,12 +7,14 @@ import { Event } from "../models/Event";
 import { User } from "../models/User";
 import EventDetailProfileScreen from "../screens/EventDetailProfileScreen";
 import ProfileStackNavigator from "./ProfileStackNavigator";
+import ChatScreen from "../screens/ChatScreen";
 
 export type RootStackParamList = {
   Tabs: undefined;
   EventDetail: { event: Event };
   EventDetailProfile: { user: User };
   ProfileStack: undefined;
+  Chat: { eventId: number };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,7 +26,7 @@ export default function RootNavigator() {
       <Stack.Screen name="EventDetail" component={EventDetailScreen} />
       <Stack.Screen name="EventDetailProfile" component={EventDetailProfileScreen} />
       <Stack.Screen name="ProfileStack" component={ProfileStackNavigator} options={{ headerShown: false }} />
-
+      <Stack.Screen name="Chat" component={ChatScreen} />
     </Stack.Navigator>
   );
 }

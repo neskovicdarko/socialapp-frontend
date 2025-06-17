@@ -167,6 +167,10 @@ export default function HomeScreen() {
               onError={() => console.warn("Failed to load avatar")}
             />
             <Text style={styles.modalTitle}>{selectedEvent?.title}</Text>
+            <Text style={styles.modalRating}>
+              ⭐ {selectedEvent?.owner?.profile?.rating?.toFixed(1) ?? "N/A"} (
+              {selectedEvent?.owner?.profile?.number_of_ratings ?? 0} ratings)
+            </Text>
             <Text>{selectedEvent?.description || "No description."}</Text>
             <Text style={{ marginTop: 10 }}>Location: {selectedEvent?.location}</Text>
             <Text>Starts at: {selectedEvent?.starts_at}</Text>
@@ -232,6 +236,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalRating: {
+    fontSize: 16,
+    color: "gray",
     marginBottom: 10,
     textAlign: "center",
   },
