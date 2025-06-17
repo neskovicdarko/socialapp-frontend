@@ -6,6 +6,7 @@ export interface Profile {
   rating: number;
   number_of_ratings: number;
   profile_photo?: string;
+  location?: string;
 }
 
 export interface User {

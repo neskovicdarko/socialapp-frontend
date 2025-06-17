@@ -17,13 +17,17 @@ import { useLoading } from "../context/LoadingContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Icon from "react-native-vector-icons/FontAwesome5";
+import axios from "axios";
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<User | null>(null);
   const [form, setForm] = useState<Partial<User["profile"]>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [locationResults, setLocationResults] = useState<any[]>([]);
   const { setLoading } = useLoading();
+
+  const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
 
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
@@ -104,9 +108,26 @@ export default function ProfileScreen({ navigation }: any) {
       setUser(res.data);
       setForm(res.data.profile);
       setIsEditing(false);
+      setLocationResults([]);
     } catch (error: any) {
       console.error("Profile update failed", error.response?.data);
       Alert.alert("Error", error.response?.data?.message || "Failed to update profile.");
+    }
+  };
+
+  const searchLocation = async (text: string) => {
+    setForm({ ...form, location: text });
+    if (text.length < 3) return;
+    try {
+      const res = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&types=(cities)&key=${GOOGLE_API_KEY}`
+      );
+      const results = res.data.predictions
+        .map((p: any) => p.description)
+        .filter((desc: any) => typeof desc === "string");
+      setLocationResults(results);
+    } catch (err) {
+      console.error("Location fetch error", err);
     }
   };
 
@@ -124,7 +145,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarContainer}>
           <Image
             source={
@@ -140,18 +161,15 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         <View style={styles.centeredInfo}>
-          <Text style={styles.name}>
-            {profile.first_name} {profile.last_name}
-          </Text>
+          <Text style={styles.name}>{profile.first_name} {profile.last_name}</Text>
           <Text style={styles.infoText}>{formatDateLocalized(profile.date_of_birth)}</Text>
+          {profile.location && (
+            <Text style={styles.infoText}>{profile.location}</Text>
+          )}
           <Text style={styles.infoText}>{user.email}</Text>
-          {profile.description ? (
-            <Text style={styles.description}>{profile.description}</Text>
-          ) : null}
+          {profile.description && <Text style={styles.description}>{profile.description}</Text>}
           <View style={styles.ratingRow}>
-            <Text style={styles.ratingText}>
-              {profile.rating?.toFixed(1)} ⭐ ({profile.number_of_ratings})
-            </Text>
+            <Text style={styles.ratingText}>{profile.rating?.toFixed(1)} ⭐ ({profile.number_of_ratings})</Text>
           </View>
         </View>
 
@@ -169,20 +187,41 @@ export default function ProfileScreen({ navigation }: any) {
             ))}
 
             <View style={styles.inputGroup}>
+              <Text style={styles.label}>Location</Text>
+              <TextInput
+                style={styles.input}
+                value={typeof form.location === "string" ? form.location : ""}
+                onChangeText={searchLocation}
+                placeholder="City, Country"
+              />
+              {locationResults.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {locationResults.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.locationSuggestion}
+                      onPress={() => {
+                        setForm({ ...form, location: item });
+                        setLocationResults([]);
+                      }}
+                    >
+                      <Text>{item}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Date of Birth</Text>
               <TouchableOpacity
                 style={[styles.input, { justifyContent: "center" }]}
-                onPress={() => setShowDatePicker(true)}
-              >
+                onPress={() => setShowDatePicker(true)}>
                 <Text>{formatDateLocalized(form.date_of_birth)}</Text>
               </TouchableOpacity>
               {showDatePicker && (
                 <DateTimePicker
-                  value={
-                    form.date_of_birth
-                      ? new Date(form.date_of_birth)
-                      : new Date("2000-01-01")
-                  }
+                  value={form.date_of_birth ? new Date(form.date_of_birth) : new Date("2000-01-01")}
                   mode="date"
                   display="default"
                   maximumDate={new Date()}
@@ -201,25 +240,31 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         )}
       </ScrollView>
-
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={isEditing ? handleSave : () => setIsEditing(true)}
-        >
-          <Text style={styles.buttonText}>{isEditing ? "Save" : "Edit"}</Text>
-        </TouchableOpacity>
+        {isEditing ? (
+          <TouchableOpacity style={styles.button} onPress={handleSave}>
+            <Text style={styles.buttonText}>Save</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setIsEditing(true)}>
+              <Text style={styles.buttonText}>Edit</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("ChangePassword")}
-        >
-          <Text style={styles.secondaryButtonText}>Change Password</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => navigation.navigate("ChangePassword")}
+            >
+              <Text style={styles.secondaryButtonText}>Change Password</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Log Out</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutButtonText}>Log Out</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -293,4 +338,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  locationSuggestion: {
+    padding: 10,
+    backgroundColor: "#f9f9f9",
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+  suggestionsContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    backgroundColor: "#fff",
+    marginTop: -10,
+    zIndex: 10,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
 });
