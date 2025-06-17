@@ -12,16 +12,19 @@ import MapView, {
   Marker,
   PROVIDER_GOOGLE,
   LatLng,
-  Region,
 } from "react-native-maps";
 import Geolocation from "@react-native-community/geolocation";
+import api from "../api";
+import Geocoder from "react-native-geocoding";
+
+Geocoder.init("AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34");
 
 export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [marker, setMarker] = useState<LatLng | null>(null);
+  const [profileLocation, setProfileLocation] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
 
-  // Ask for location permission and get initial user location
   useEffect(() => {
     const requestPermissionAndTrack = async () => {
       try {
@@ -46,28 +49,37 @@ export default function MapScreen() {
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
         );
       } catch (err) {
-          if (err instanceof Error) {
-            Alert.alert("Error requesting location permission", err.message);
-          } else {
-            Alert.alert("Unknown error occurred");
-          }
+        if (err instanceof Error) {
+          Alert.alert("Error requesting location permission", err.message);
+        } else {
+          Alert.alert("Unknown error occurred");
         }
+      }
+    };
+
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get("/profile");
+        const loc = res.data.profile?.location;
+        if (loc) setProfileLocation(loc);
+      } catch (err) {
+        console.error("Failed to fetch profile", err);
+      }
     };
 
     requestPermissionAndTrack();
+    fetchProfile();
   }, []);
 
   const centerMapOn = (coords: LatLng) => {
-    if (mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          ...coords,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        1000
-      );
-    }
+    mapRef.current?.animateToRegion(
+      {
+        ...coords,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      1000
+    );
   };
 
   const handleMapPress = (e: any) => {
@@ -88,6 +100,21 @@ export default function MapScreen() {
 
   const centerOnUser = () => {
     if (userLocation) centerMapOn(userLocation);
+  };
+
+  const centerOnHome = async () => {
+    if (!profileLocation) {
+      Alert.alert("No home location", "Set your location in your profile.");
+      return;
+    }
+    try {
+      const geo = await Geocoder.from(profileLocation);
+      const loc = geo.results[0].geometry.location;
+      centerMapOn({ latitude: loc.lat, longitude: loc.lng });
+    } catch (err) {
+      Alert.alert("Error", "Could not geocode home location.");
+      console.warn("Geocoding error", err);
+    }
   };
 
   return (
@@ -112,6 +139,11 @@ export default function MapScreen() {
       {/* Center on user */}
       <TouchableOpacity onPress={centerOnUser} style={styles.centerButton}>
         <Text style={styles.buttonText}>🎯</Text>
+      </TouchableOpacity>
+
+      {/* Center on home (profile) */}
+      <TouchableOpacity onPress={centerOnHome} style={styles.homeButton}>
+        <Text style={styles.buttonText}>🏠</Text>
       </TouchableOpacity>
 
       {/* Zoom buttons */}
@@ -149,6 +181,18 @@ const styles = StyleSheet.create({
     bottom: 180,
     right: 20,
     backgroundColor: "white",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+  },
+  homeButton: {
+    position: "absolute",
+    bottom: 110,
+    left: 20,
+    backgroundColor: "#f0f0f0",
     borderRadius: 25,
     width: 50,
     height: 50,
