@@ -12,20 +12,39 @@ import MapView, {
   Marker,
   PROVIDER_GOOGLE,
   LatLng,
+  Region,
 } from "react-native-maps";
 import Geolocation from "@react-native-community/geolocation";
 import api from "../api";
 import Geocoder from "react-native-geocoding";
+import {markers} from '../assets/markers'
 
 Geocoder.init("AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34");
+
+interface EventItem {
+  id: number;
+  title: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+}
+
+const INITIAL_REGION={
+          latitude: 44.7866,
+          longitude: 20.4489,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }
 
 export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [marker, setMarker] = useState<LatLng | null>(null);
   const [profileLocation, setProfileLocation] = useState<string | null>(null);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
+    
     const requestPermissionAndTrack = async () => {
       try {
         if (Platform.OS === "android") {
@@ -39,36 +58,48 @@ export default function MapScreen() {
         }
 
         Geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const coords = { latitude, longitude };
+          position => {
+            const coords = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            };
             setUserLocation(coords);
             centerMapOn(coords);
           },
-          (error) => Alert.alert("Location error", error.message),
+          error => Alert.alert("Location error", error.message),
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
         );
       } catch (err) {
-        if (err instanceof Error) {
-          Alert.alert("Error requesting location permission", err.message);
-        } else {
-          Alert.alert("Unknown error occurred");
-        }
+        Alert.alert("Error requesting location permission", (err as Error).message);
       }
     };
 
     const fetchProfile = async () => {
       try {
         const res = await api.get("/profile");
-        const loc = res.data.profile?.location;
-        if (loc) setProfileLocation(loc);
+        setProfileLocation(res.data.profile?.location);
       } catch (err) {
         console.error("Failed to fetch profile", err);
       }
     };
 
+    const fetchEvents = async () => {
+      try {
+        const res = await api.get("/events");
+        setEvents(res.data);
+        console.log("Fetched events:", res.data)
+        if (res.data.length > 0) {
+          const first = res.data[0];
+          centerMapOn({ latitude: parseFloat(first.latitude), longitude: parseFloat(first.longitude) });
+        }
+      } catch (err) {
+        console.error("Failed to fetch events", err);
+      }
+    };
+
     requestPermissionAndTrack();
     fetchProfile();
+    fetchEvents();
   }, []);
 
   const centerMapOn = (coords: LatLng) => {
@@ -89,23 +120,17 @@ export default function MapScreen() {
 
   const zoom = async (direction: "in" | "out") => {
     const camera = await mapRef.current?.getCamera();
-    if (camera) {
-      const zoomAmount = direction === "in" ? 1 : -1;
-      if (camera.zoom !== undefined) {
-        camera.zoom += zoomAmount;
-        mapRef.current?.animateCamera(camera, { duration: 300 });
-      }
+    if (camera?.zoom !== undefined) {
+      camera.zoom += direction === "in" ? 1 : -1;
+      mapRef.current?.animateCamera(camera, { duration: 300 });
     }
   };
 
-  const centerOnUser = () => {
-    if (userLocation) centerMapOn(userLocation);
-  };
+  const centerOnUser = () => userLocation && centerMapOn(userLocation);
 
   const centerOnHome = async () => {
     if (!profileLocation) {
-      Alert.alert("No home location", "Set your location in your profile.");
-      return;
+      return Alert.alert("No home location", "Set your location in profile.");
     }
     try {
       const geo = await Geocoder.from(profileLocation);
@@ -113,40 +138,49 @@ export default function MapScreen() {
       centerMapOn({ latitude: loc.lat, longitude: loc.lng });
     } catch (err) {
       Alert.alert("Error", "Could not geocode home location.");
-      console.warn("Geocoding error", err);
+      console.warn(err);
     }
   };
+
+  const onMarkerSelected = (marker: any) => {
+    Alert.alert(marker.name);
+  }
 
   return (
     <View style={styles.container}>
       <MapView
-        ref={mapRef}
+        key="map-instance"
         style={StyleSheet.absoluteFillObject}
         provider={PROVIDER_GOOGLE}
+        initialRegion={INITIAL_REGION}
         showsUserLocation={true}
-        showsMyLocationButton={false}
+        showsMyLocationButton
+        ref={mapRef}
         onPress={handleMapPress}
-        initialRegion={{
-          latitude: 44.7866,
-          longitude: 20.4489,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
       >
         {marker && <Marker coordinate={marker} />}
+        {events.map(ev => {
+          console.log("Rendering event marker:", ev);
+          return(
+          <Marker
+            key={ev.id}
+            coordinate={{ latitude: ev.latitude, longitude: ev.longitude }}
+            pinColor="green"
+            title={ev.title}
+            description={ev.location}
+          />
+          );
+        })}
       </MapView>
 
-      {/* Center on user */}
       <TouchableOpacity onPress={centerOnUser} style={styles.centerButton}>
         <Text style={styles.buttonText}>🎯</Text>
       </TouchableOpacity>
 
-      {/* Center on home (profile) */}
       <TouchableOpacity onPress={centerOnHome} style={styles.homeButton}>
         <Text style={styles.buttonText}>🏠</Text>
       </TouchableOpacity>
 
-      {/* Zoom buttons */}
       <View style={styles.zoomControls}>
         <TouchableOpacity onPress={() => zoom("in")} style={styles.zoomButton}>
           <Text style={styles.buttonText}>＋</Text>
@@ -200,7 +234,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 4,
   },
-  buttonText: {
-    fontSize: 22,
-  },
+  buttonText: { fontSize: 22 },
 });
