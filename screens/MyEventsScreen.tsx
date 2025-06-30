@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -57,8 +58,7 @@ export default function MyEventsScreen() {
       const response = await api.get<Event[]>("/events/my");
       setEvents(response.data);
     } catch (err) {
-      const error = err as AxiosError;
-      console.error("Failed to load my events", error);
+      console.error("Failed to load my events", err as AxiosError);
     }
   };
 
@@ -93,16 +93,26 @@ export default function MyEventsScreen() {
           <View style={styles.cardHeader}>
             <Text style={styles.eventTitle}>{item.title}</Text>
             {stats.pending > 0 && (
-              <View style={[styles.badge, { backgroundColor: "red" }]}> 
+              <View style={[styles.badge, { backgroundColor: "red" }]}>
                 <Text style={styles.badgeText}>{stats.pending}</Text>
               </View>
             )}
           </View>
+
           <Text style={styles.eventDetail}>{item.starts_at}</Text>
           <Text style={styles.eventDetail}>{item.location}</Text>
+
+          {item.category && (
+            <Text style={styles.eventDetail}>
+              Category: {item.category.name.replace(/-/g, " ")}
+            </Text>
+          )}
+
           {stats.accepted > 0 && (
             <View style={styles.participantBadge}>
-              <Text style={styles.participantBadgeText}>{stats.accepted} participant{stats.accepted > 1 ? 's' : ''}</Text>
+              <Text style={styles.participantBadgeText}>
+                {stats.accepted} participant{stats.accepted > 1 ? "s" : ""}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -110,27 +120,24 @@ export default function MyEventsScreen() {
     );
   };
 
+  if (loading) {
+    return <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />;
+  }
+
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />
-      ) : (
-        <FlatList
-          data={events}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-        />
-      )}
-    </View>
+    <FlatList
+      data={events}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id.toString()}
+      contentContainerStyle={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 16,
     backgroundColor: "#fff",
   },

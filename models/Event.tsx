@@ -1,3 +1,4 @@
+import { Category } from "./Category";
 import { User } from "./User";
 
 export interface Event {
@@ -8,11 +9,13 @@ export interface Event {
   ends_at?: string;
   location?: string;
   owner_id: number;
+  category_id?: number;
+  category?: Category;
   created_at?: string;
   updated_at?: string;
   owner: User;
   pivot?: {
-    status: number; // 0: Pending, 1: Accepted, 2: Rejected
+    status: number;
   };
   last_message?: {
     id: number;

@@ -16,8 +16,6 @@ import { Event } from "../models/Event";
 import { User } from "../models/User";
 import api from "../api";
 
-// Types
-
 type EventDetailRouteProp = RouteProp<RootStackParamList, "EventDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type UserWithStatus = User & { pivot: { status: number } };
@@ -89,6 +87,13 @@ export default function EventDetailScreen({ route }: { route: EventDetailRoutePr
       <Text style={styles.title}>{event.title}</Text>
       <Text style={styles.detail}>{event.starts_at}</Text>
       <Text style={styles.detail}>{event.location}</Text>
+
+      {event.category && (
+        <Text style={styles.detail}>
+          Category: {event.category.name.replace(/-/g, " ")}
+        </Text>
+      )}
+
       <Text style={styles.description}>{event.description}</Text>
 
       {event.owner_id !== userId && (

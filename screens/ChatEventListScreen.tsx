@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -26,7 +26,6 @@ export default function ChatEventsScreen() {
 
   const fetchChatEvents = async () => {
     try {
-      setLoading(true);
       const res = await api.get("/chat/events");
       setEvents(res.data);
     } catch (err) {
@@ -72,9 +71,17 @@ export default function ChatEventsScreen() {
               <Text style={styles.eventTitle}>{event.title}</Text>
               <Text style={styles.eventMeta}>{event.starts_at}</Text>
               {event.last_message && (
-                <Text style={styles.lastMessage}>
-                  {event.last_message.user?.profile?.first_name} {event.last_message.user?.profile?.last_name}: {event.last_message.content}
-                </Text>
+                <View style={styles.messageBubble}>
+                  <View style={styles.messageHeader}>
+                    <Text style={styles.lastMessage}>
+                      {event.last_message.user?.profile?.first_name} {event.last_message.user?.profile?.last_name}:
+                    </Text>
+                    <Text style={styles.messageTime}>
+                      {new Date(event.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                  <Text style={styles.lastMessageContent}>{event.last_message.content}</Text>
+                </View>
               )}
             </TouchableOpacity>
           ))}
@@ -100,27 +107,46 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     padding: 16,
-    borderRadius: 10,
-    backgroundColor: "#f1f1f1",
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderRadius: 12,
+    backgroundColor: "#E0F2F1",
+    marginBottom: 12,
+    borderLeftWidth: 6,
+    borderLeftColor: "#00796B",
   },
   eventTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#00796B",
     marginBottom: 4,
   },
   eventMeta: {
     fontSize: 12,
-    color: "#666",
+    color: "#555",
     marginBottom: 6,
+  },
+  messageBubble: {
+    backgroundColor: "#C8E6C9",
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  messageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   lastMessage: {
     fontSize: 13,
-    color: "#333",
+    fontWeight: "600",
+    color: "#004D40",
+  },
+  messageTime: {
+    fontSize: 12,
+    color: "#004D40",
+    marginLeft: 8,
+  },
+  lastMessageContent: {
+    fontSize: 14,
+    color: "#212121",
   },
 });

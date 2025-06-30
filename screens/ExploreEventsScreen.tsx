@@ -119,6 +119,11 @@ export default function EventScreen() {
           <Text style={styles.eventTitle}>{item.title}</Text>
           <Text style={styles.eventDetail}>{item.starts_at}</Text>
           <Text style={styles.eventDetail}>{item.location}</Text>
+          {item.category && (
+            <Text style={styles.eventDetail}>
+              Category: {item.category.name.replace(/-/g, " ")}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity

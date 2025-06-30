@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   Modal,
   Pressable,
   Image,
+  RefreshControl,
 } from "react-native";
 import Icon from "react-native-vector-icons/FontAwesome5";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Event } from "../models/Event";
 import api from "../api";
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [revokingIds, setRevokingIds] = useState<Set<number>>(new Set());
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchApplications();
@@ -38,6 +40,17 @@ export default function HomeScreen() {
       console.error("Failed to fetch applications", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchApplications();
+    } catch (err) {
+      console.error("Refresh failed", err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -105,6 +118,9 @@ export default function HomeScreen() {
               Host: {profile?.first_name} {profile?.last_name}
             </Text>
             <Text style={styles.appText}>Status: {statusText}</Text>
+            {item.category && (
+              <Text style={styles.appText}>Category: {item.category.name.replace(/-/g, " ")}</Text>
+            )}
           </View>
           <TouchableOpacity
             onPress={() => revokeApplication(item.id)}
@@ -134,6 +150,7 @@ export default function HomeScreen() {
             renderItem={renderApplication}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingBottom: 20 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           />
         )}
       </View>
@@ -175,6 +192,9 @@ export default function HomeScreen() {
             <Text style={{ marginTop: 10 }}>Location: {selectedEvent?.location}</Text>
             <Text>Starts at: {selectedEvent?.starts_at}</Text>
             <Text>Ends at: {selectedEvent?.ends_at}</Text>
+            {selectedEvent?.category && (
+              <Text>Category: {selectedEvent.category.name.replace(/-/g, " ")}</Text>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
