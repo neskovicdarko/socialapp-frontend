@@ -12,12 +12,20 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import api from "../api";
+import axios from "axios";
+import Geocoder from "react-native-geocoding";
 import { Category } from "../models/Category";
+
+Geocoder.init("AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34");
 
 export default function CreateScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+
   const [categoryId, setCategoryId] = useState<Category["id"] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -27,11 +35,16 @@ export default function CreateScreen() {
   const [startTime, setStartTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
+
   useEffect(() => {
-    api.get("/categories")
-      .then(res => setCategories(res.data))
-      .catch(err => console.error("Failed to load categories", err));
+    api
+      .get("/categories")
+      .then((res) => setCategories(res.data))
+      .catch((err) => console.error("Failed to load categories", err));
   }, []);
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
 
   const formatToMysqlDatetime = (dateObj: Date, timeObj: Date): string => {
     const combined = new Date(
@@ -39,34 +52,76 @@ export default function CreateScreen() {
       dateObj.getMonth(),
       dateObj.getDate(),
       timeObj.getHours(),
+      timeObj.getMinutes(),
+      timeObj.getSeconds()
+    );
+
+    const year = combined.getFullYear();
+    const month = pad(combined.getMonth() + 1);
+    const day = pad(combined.getDate());
+    const hour = pad(combined.getHours());
+    const minute = pad(combined.getMinutes());
+    const second = pad(combined.getSeconds());
+
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  };
+
+  const isDateTimeValid = (dateObj: Date, timeObj: Date) => {
+    const combined = new Date(
+      dateObj.getFullYear(),
+      dateObj.getMonth(),
+      dateObj.getDate(),
+      timeObj.getHours(),
       timeObj.getMinutes()
     );
-    return combined.toISOString().replace("T", " ").substring(0, 19);
+    return combined > new Date();
   };
 
   const handleCreate = async () => {
-    const startsAt = formatToMysqlDatetime(startDate, startTime);
-    const now = new Date();
-
-    if (new Date(startsAt) <= now) {
-      Alert.alert("Invalid Time", "Event must be set in the future.");
-      return;
+    if (!isDateTimeValid(startDate, startTime)) {
+      return Alert.alert("Invalid Time", "Event must be set in the future.");
     }
 
+    const startsAt = formatToMysqlDatetime(startDate, startTime);
+
     try {
+      const geo = await Geocoder.from(location);
+      if (!geo.results.length) {
+        return Alert.alert("Error", "Invalid location");
+      }
+      const { lat, lng } = geo.results[0].geometry.location;
+
       await api.post("/events", {
         title,
         description,
         location,
         starts_at: startsAt,
         category_id: categoryId,
+        latitude: lat,
+        longitude: lng,
       });
 
       Alert.alert("Success", "Event created successfully!");
-    } catch (error: unknown) {
-      const err = error as any;
-      console.error("Create error:", err.response || err.message);
-      Alert.alert("Error", err.response?.data?.message || "Something went wrong.");
+    } catch (error: any) {
+      console.error("Create error:", error);
+      Alert.alert("Error", error.response?.data?.message || "Something went wrong.");
+    }
+  };
+
+  const searchAddress = async (input: string) => {
+    setLocation(input);
+    if (input.length < 3) return;
+
+    try {
+      const res = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          input
+        )}&key=${GOOGLE_API_KEY}`
+      );
+      const results = res.data.predictions.map((p: any) => p.description);
+      setLocationSuggestions(results);
+    } catch (err) {
+      console.error("Autocomplete error", err);
     }
   };
 
@@ -74,13 +129,13 @@ export default function CreateScreen() {
     <View style={styles.container}>
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Title</Text>
-        <TextInput style={styles.touchableInput} value={title} onChangeText={setTitle} />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} />
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Description</Text>
         <TextInput
-          style={styles.touchableInput}
+          style={styles.input}
           value={description}
           onChangeText={setDescription}
           multiline
@@ -90,16 +145,29 @@ export default function CreateScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Location</Text>
         <TextInput
-          style={styles.touchableInput}
+          style={styles.input}
           value={location}
-          onChangeText={setLocation}
+          onChangeText={searchAddress}
+          placeholder="Enter address"
         />
+        {locationSuggestions.map((suggestion, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => {
+              setLocation(suggestion);
+              setLocationSuggestions([]);
+            }}
+            style={styles.suggestionItem}
+          >
+            <Text>{suggestion}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Category</Text>
         <TouchableOpacity
-          style={styles.touchableInput}
+          style={styles.input}
           onPress={() => setShowCategoryPicker(true)}
         >
           <Text>
@@ -135,7 +203,7 @@ export default function CreateScreen() {
                     >
                       <Text
                         style={
-                          item.id === categoryId ? styles.modalItemTextSelected : null
+                          item.id === categoryId ? styles.modalItemTextSelected : undefined
                         }
                       >
                         {item.name.replace(/-/g, " ")}
@@ -158,7 +226,7 @@ export default function CreateScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Start Date</Text>
         <TouchableOpacity
-          style={styles.touchableInput}
+          style={styles.input}
           onPress={() => setShowDatePicker(true)}
         >
           <Text>{startDate.toDateString()}</Text>
@@ -180,11 +248,14 @@ export default function CreateScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Start Time</Text>
         <TouchableOpacity
-          style={styles.touchableInput}
+          style={styles.input}
           onPress={() => setShowTimePicker(true)}
         >
           <Text>
-            {startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {startTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </Text>
         </TouchableOpacity>
         {showTimePicker && (
@@ -212,7 +283,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: "#fff" },
   inputGroup: { marginBottom: 12 },
   label: { fontWeight: "600", marginBottom: 4, color: "#333" },
-  touchableInput: {
+  input: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
@@ -228,6 +299,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  suggestionItem: {
+    padding: 10,
+    backgroundColor: "#f9f9f9",
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
