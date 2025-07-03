@@ -8,6 +8,9 @@ export interface Event {
   starts_at: string;
   ends_at?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
+  is_completed: boolean; // ✅ OVO DODAJ
   owner_id: number;
   category_id?: number;
   category?: Category;
