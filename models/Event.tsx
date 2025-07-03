@@ -10,7 +10,7 @@ export interface Event {
   location?: string;
   latitude?: number;
   longitude?: number;
-  is_completed: boolean; // ✅ OVO DODAJ
+  is_completed: boolean;
   owner_id: number;
   category_id?: number;
   category?: Category;
