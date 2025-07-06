@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
 } from "react-native";
-import { useNavigation, RouteProp } from "@react-navigation/native";
+import { useNavigation, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -20,6 +19,13 @@ type EventDetailRouteProp = RouteProp<RootStackParamList, "EventDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type UserWithStatus = User & { pivot: { status: number } };
 
+interface Comment {
+  id: number;
+  content: string;
+  user: { id: number; name: string };
+  created_at?: string;
+}
+
 export default function EventDetailScreen({ route }: { route: EventDetailRouteProp }) {
   const { event } = route.params;
   const navigation = useNavigation<NavigationProp>();
@@ -28,6 +34,9 @@ export default function EventDetailScreen({ route }: { route: EventDetailRoutePr
   const [applications, setApplications] = useState<UserWithStatus[]>([]);
   const [loadingApplications, setLoadingApplications] = useState(true);
   const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
+
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
 
   useEffect(() => {
     const loadUserId = async () => {
@@ -73,6 +82,24 @@ export default function EventDetailScreen({ route }: { route: EventDetailRoutePr
       });
     }
   };
+
+  const fetchComments = async () => {
+    setLoadingComments(true);
+    try {
+      const res = await api.get(`/events/${event.id}/comments`);
+      setComments(res.data);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchComments();
+    }, [event.id])
+  );
 
   if (userId === null) {
     return (
@@ -174,6 +201,27 @@ export default function EventDetailScreen({ route }: { route: EventDetailRoutePr
           )}
         </View>
       )}
+
+      <View style={styles.commentsSection}>
+        <Text style={styles.commentsTitle}>Comments</Text>
+        {loadingComments ? (
+          <ActivityIndicator />
+        ) : comments.length === 0 ? (
+          <Text style={styles.noComments}>No comments yet.</Text>
+        ) : (
+          comments.map((comment) => (
+            <View key={comment.id} style={styles.commentBubble}>
+              <Text style={styles.commentAuthor}>{comment.user.name}</Text>
+              <Text style={styles.commentContent}>{comment.content}</Text>
+              {comment.created_at && (
+                <Text style={styles.commentTimestamp}>
+                  {new Date(comment.created_at).toLocaleString("sr-RS")}
+                </Text>
+              )}
+            </View>
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -260,5 +308,48 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 14,
+  },
+  commentsSection: {
+    marginTop: 30,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    paddingTop: 16,
+  },
+  commentsTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  noComments: {
+    fontStyle: "italic",
+    color: "#666",
+  },
+  commentBubble: {
+    backgroundColor: "#f0f0f0",
+    borderRadius: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    alignSelf: "flex-start",
+    maxWidth: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  commentAuthor: {
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  commentContent: {
+    fontSize: 14,
+    color: "#333",
+  },
+  commentTimestamp: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#777",
+    textAlign: "right",
   },
 });
