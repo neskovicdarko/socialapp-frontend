@@ -17,7 +17,6 @@ import MapView, {
 import Geolocation from "@react-native-community/geolocation";
 import api from "../api";
 import Geocoder from "react-native-geocoding";
-import {markers} from '../assets/markers'
 
 Geocoder.init("AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34");
 
@@ -205,14 +204,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     width: 50,
     height: 50,
-    marginBottom: 10,
+    marginBottom: 40,
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
   },
   centerButton: {
     position: "absolute",
-    bottom: 180,
+    bottom: 250,
     right: 20,
     backgroundColor: "white",
     borderRadius: 25,
