@@ -37,7 +37,6 @@ export default function HomeScreen() {
 
   const navigation = useNavigation<NavigationProp>();
 
-  // Za modal komentara:
   const [commentModalVisible, setCommentModalVisible] = useState(false);
   const [commentEvent, setCommentEvent] = useState<Event | null>(null);
   const [comment, setComment] = useState("");
@@ -97,7 +96,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Komentari - funkcije
   const fetchComments = async (eventId: number) => {
     try {
       const res = await api.get(`/events/${eventId}/comments`);
@@ -398,7 +396,7 @@ export default function HomeScreen() {
             setRatingEvent(null);
             onRefresh();
           }}
-          currentUserId={1} // zameni stvarnim ID-jem korisnika
+          currentUserId={1} //TODO
         />
       )}
     </SafeAreaView>
