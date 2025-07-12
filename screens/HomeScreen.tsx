@@ -135,6 +135,9 @@ export default function HomeScreen() {
   };
 
   const renderApplication = ({ item }: { item: Event }) => {
+    if (!item.id) {
+      console.warn("Application item missing id!", item);
+    }
     const status = (item as any).pivot?.status;
     let statusText = "Unknown";
     let backgroundColor = "#f9f9f9";
@@ -205,6 +208,10 @@ export default function HomeScreen() {
   };
 
   const renderPastEvent = ({ item }: { item: Event }) => {
+    if (!item.id) {
+      console.warn("Past event item missing id!", item);
+    }
+
     const profile = item.owner?.profile;
     const rawPhoto = profile?.profile_photo;
     const profilePhotoUri =
@@ -269,7 +276,7 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Ikonica komentara */}
+        {/* Ikonica komentara (donji desni ugao) */}
         <TouchableOpacity
           style={styles.commentIcon}
           onPress={() => openCommentModal(item)}
@@ -292,7 +299,9 @@ export default function HomeScreen() {
           <FlatList
             data={applications}
             renderItem={renderApplication}
-            keyExtractor={(item) => `app-${item.id}`}
+            keyExtractor={(item) =>
+              item.id ? `app-${item.id.toString()}` : `app-unknown-${Math.random()}`
+            }
             scrollEnabled={false}
           />
         )}
@@ -308,7 +317,9 @@ export default function HomeScreen() {
           <FlatList
             data={pastEvents}
             renderItem={renderPastEvent}
-            keyExtractor={(item) => `past-${item.id}`}
+            keyExtractor={(item) =>
+              item.id ? `past-${item.id.toString()}` : `past-unknown-${Math.random()}`
+            }
             scrollEnabled={false}
           />
         )}
@@ -378,7 +389,10 @@ export default function HomeScreen() {
               <TouchableOpacity onPress={closeCommentModal}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSubmitButton} onPress={submitComment}>
+              <TouchableOpacity
+                style={styles.modalSubmitButton}
+                onPress={submitComment}
+              >
                 <Text style={styles.modalSubmitText}>Leave a Comment</Text>
               </TouchableOpacity>
             </View>
