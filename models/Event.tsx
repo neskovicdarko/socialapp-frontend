@@ -10,13 +10,14 @@ export interface Event {
   location?: string;
   latitude?: number;
   longitude?: number;
-  is_completed: boolean; // ✅ OVO DODAJ
+  is_completed: boolean;
   owner_id: number;
   category_id?: number;
   category?: Category;
   created_at?: string;
   updated_at?: string;
   owner: User;
+  users?: User[];
   pivot?: {
     status: number;
   };
@@ -29,3 +30,5 @@ export interface Event {
     user?: User;
   };
 }
+export type { User };
+

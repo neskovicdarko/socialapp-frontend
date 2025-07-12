@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,41 +12,50 @@ import {
   Image,
   RefreshControl,
 } from "react-native";
-import Icon from "react-native-vector-icons/FontAwesome5";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Event } from "../models/Event";
 import api from "../api";
+import { Event } from "../models/Event";
+import EventRatingModal from "./EventRatingModal";
 
 const BASE_URL = "http://10.0.2.2:8000";
 
 export default function HomeScreen() {
   const [applications, setApplications] = useState<Event[]>([]);
+  const [completedEvents, setCompletedEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingIds, setRevokingIds] = useState<Set<number>>(new Set());
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [ratingEvent, setRatingEvent] = useState<Event | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchApplications();
+    fetchData();
   }, []);
 
-  const fetchApplications = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await api.get("/applications/mine");
-      setApplications(res.data);
+      await Promise.all([fetchApplications(), fetchCompletedEvents()]);
     } catch (err) {
-      console.error("Failed to fetch applications", err);
+      console.error("Failed to fetch data", err);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchApplications = async () => {
+    const res = await api.get("/applications/mine");
+    setApplications(res.data);
+  };
+
+  const fetchCompletedEvents = async () => {
+    const res = await api.get("/events/mine/completed");
+    setCompletedEvents(res.data);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetchApplications();
+      await fetchData();
     } catch (err) {
       console.error("Refresh failed", err);
     } finally {
@@ -100,7 +109,10 @@ export default function HomeScreen() {
         : null;
 
     return (
-      <TouchableOpacity onPress={() => setSelectedEvent(item)} style={[styles.appCardTile, { backgroundColor }]}>
+      <TouchableOpacity
+        onPress={() => setSelectedEvent(item)}
+        style={[styles.appCardTile, { backgroundColor }]}
+      >
         <View style={styles.appCardContentTile}>
           <Image
             source={
@@ -110,7 +122,6 @@ export default function HomeScreen() {
             }
             style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
             resizeMode="cover"
-            onError={() => console.warn("Failed to load profile image")}
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.appTitle}>{item.title}</Text>
@@ -119,7 +130,9 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.appText}>Status: {statusText}</Text>
             {item.category && (
-              <Text style={styles.appText}>Category: {item.category.name.replace(/-/g, " ")}</Text>
+              <Text style={styles.appText}>
+                Category: {item.category.name.replace(/-/g, " ")}
+              </Text>
             )}
           </View>
           <TouchableOpacity
@@ -128,7 +141,68 @@ export default function HomeScreen() {
             disabled={isRevoking}
           >
             <Text style={styles.revokeButtonText}>
-              {isRevoking ? "..." : isFinal ? "Delete Application" : "Revoke"}
+              {isRevoking ? "..." : isFinal ? "Delete" : "Revoke"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderCompletedEvent = ({ item }: { item: Event }) => {
+    const profile = item.owner?.profile;
+    const rawPhoto = profile?.profile_photo;
+    const profilePhotoUri =
+      rawPhoto?.startsWith("http")
+        ? rawPhoto
+        : rawPhoto
+        ? `${BASE_URL}${rawPhoto}`
+        : null;
+
+    const alreadyRated = !!(item as any).is_rated;
+
+    return (
+      <TouchableOpacity
+        onPress={() => setSelectedEvent(item)}
+        style={[styles.appCardTile, { backgroundColor: "#eee" }]}
+      >
+        <View style={styles.appCardContentTile}>
+          <Image
+            source={
+              profilePhotoUri
+                ? { uri: profilePhotoUri }
+                : require("../assets/default-avatar.png")
+            }
+            style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
+            resizeMode="cover"
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.appTitle}>{item.title}</Text>
+            <Text style={styles.appText}>
+              Host: {profile?.first_name} {profile?.last_name}
+            </Text>
+            {item.category && (
+              <Text style={styles.appText}>
+                Category: {item.category.name.replace(/-/g, " ")}
+              </Text>
+            )}
+            <Text style={styles.appText}>
+              Completed:{" "}
+              {item.ends_at
+                ? new Date(item.ends_at).toLocaleString()
+                : "N/A"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.revokeButton,
+              alreadyRated && { backgroundColor: "#ccc" },
+            ]}
+            disabled={alreadyRated}
+            onPress={() => setRatingEvent(item)}
+          >
+            <Text style={styles.revokeButtonText}>
+              {alreadyRated ? "Already Rated" : "Rate"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -148,26 +222,55 @@ export default function HomeScreen() {
           <FlatList
             data={applications}
             renderItem={renderApplication}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => `app-${item.id}`}
             contentContainerStyle={{ paddingBottom: 20 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
           />
         )}
+
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontSize: 20, marginBottom: 12 }}>
+            Completed Events
+          </Text>
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : completedEvents.length === 0 ? (
+            <Text>No completed events yet.</Text>
+          ) : (
+            <FlatList
+              data={completedEvents}
+              renderItem={renderCompletedEvent}
+              keyExtractor={(item) => `completed-${item.id}`}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+            />
+          )}
+        </View>
       </View>
 
+      {/* Postojeći modal koji pokazuje detalje eventa */}
       <Modal
         visible={!!selectedEvent}
         transparent
         animationType="fade"
         onRequestClose={() => setSelectedEvent(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedEvent(null)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setSelectedEvent(null)}
+        >
           <Pressable style={styles.modalContent} onPress={() => {}}>
             <Image
               source={
                 selectedEvent?.owner?.profile?.profile_photo
                   ? {
-                      uri: selectedEvent.owner.profile.profile_photo.startsWith("http")
+                      uri: selectedEvent.owner.profile.profile_photo.startsWith(
+                        "http"
+                      )
                         ? selectedEvent.owner.profile.profile_photo
                         : `${BASE_URL}${selectedEvent.owner.profile.profile_photo}`,
                     }
@@ -185,19 +288,39 @@ export default function HomeScreen() {
             />
             <Text style={styles.modalTitle}>{selectedEvent?.title}</Text>
             <Text style={styles.modalRating}>
-              ⭐ {selectedEvent?.owner?.profile?.rating?.toFixed(1) ?? "N/A"} (
+              ⭐{" "}
+              {selectedEvent?.owner?.profile?.rating?.toFixed(1) ?? "N/A"} (
               {selectedEvent?.owner?.profile?.number_of_ratings ?? 0} ratings)
             </Text>
             <Text>{selectedEvent?.description || "No description."}</Text>
-            <Text style={{ marginTop: 10 }}>Location: {selectedEvent?.location}</Text>
+            <Text style={{ marginTop: 10 }}>
+              Location: {selectedEvent?.location}
+            </Text>
             <Text>Starts at: {selectedEvent?.starts_at}</Text>
             <Text>Ends at: {selectedEvent?.ends_at}</Text>
             {selectedEvent?.category && (
-              <Text>Category: {selectedEvent.category.name.replace(/-/g, " ")}</Text>
+              <Text>
+                Category:{" "}
+                {selectedEvent.category.name.replace(/-/g, " ")}
+              </Text>
             )}
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Modal za ocenjivanje */}
+      {ratingEvent && (
+        <EventRatingModal
+          event={ratingEvent}
+          visible={!!ratingEvent}
+          onClose={() => setRatingEvent(null)}
+          onFinish={() => {
+            setRatingEvent(null);
+            onRefresh();
+          }}
+          currentUserId={1} // zameni stvarnim userId ako treba
+        />
+      )}
     </SafeAreaView>
   );
 }
