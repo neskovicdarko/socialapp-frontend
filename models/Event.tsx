@@ -2,6 +2,7 @@ import { Category } from "./Category";
 import { User } from "./User";
 
 export interface Event {
+  participants: never[];
   id: number;
   title: string;
   description?: string;
@@ -29,6 +30,8 @@ export interface Event {
     updated_at?: string;
     user?: User;
   };
+  rating?: number;
+  number_of_ratings?: number;
 }
 export type { User };
 

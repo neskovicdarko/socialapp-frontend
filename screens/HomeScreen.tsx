@@ -10,22 +10,40 @@ import {
   Modal,
   Pressable,
   Image,
-  RefreshControl,
+  ScrollView,
+  TextInput,
 } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome5";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 import api from "../api";
 import { Event } from "../models/Event";
 import EventRatingModal from "./EventRatingModal";
+import { RootStackParamList } from "../navigation/RootNavigator";
 
 const BASE_URL = "http://10.0.2.2:8000";
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function HomeScreen() {
   const [applications, setApplications] = useState<Event[]>([]);
-  const [completedEvents, setCompletedEvents] = useState<Event[]>([]);
+  const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingIds, setRevokingIds] = useState<Set<number>>(new Set());
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [ratingEvent, setRatingEvent] = useState<Event | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const navigation = useNavigation<NavigationProp>();
+
+  // Za modal komentara:
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [commentEvent, setCommentEvent] = useState<Event | null>(null);
+  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<
+    { id: number; content: string; user: { id: number; name: string }; created_at: string }[]
+  >([]);
 
   useEffect(() => {
     fetchData();
@@ -34,7 +52,7 @@ export default function HomeScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchApplications(), fetchCompletedEvents()]);
+      await Promise.all([fetchApplications(), fetchPastEvents()]);
     } catch (err) {
       console.error("Failed to fetch data", err);
     } finally {
@@ -47,9 +65,9 @@ export default function HomeScreen() {
     setApplications(res.data);
   };
 
-  const fetchCompletedEvents = async () => {
-    const res = await api.get("/events/mine/completed");
-    setCompletedEvents(res.data);
+  const fetchPastEvents = async () => {
+    const res = await api.get("/events/past");
+    setPastEvents(res.data);
   };
 
   const onRefresh = async () => {
@@ -76,6 +94,45 @@ export default function HomeScreen() {
         next.delete(eventId);
         return next;
       });
+    }
+  };
+
+  // Komentari - funkcije
+  const fetchComments = async (eventId: number) => {
+    try {
+      const res = await api.get(`/events/${eventId}/comments`);
+      setComments(res.data);
+    } catch (err) {
+      console.error("Failed to load comments", err);
+    }
+  };
+
+  const openCommentModal = (event: Event) => {
+    setCommentEvent(event);
+    setCommentModalVisible(true);
+    fetchComments(event.id);
+  };
+
+  const closeCommentModal = () => {
+    setCommentModalVisible(false);
+    setCommentEvent(null);
+    setComment("");
+    setComments([]);
+  };
+
+  const submitComment = async () => {
+    if (!commentEvent) return;
+    if (!comment.trim()) return;
+
+    try {
+      await api.post("/comments", {
+        event_id: commentEvent.id,
+        content: comment.trim(),
+      });
+      setComment("");
+      fetchComments(commentEvent.id);
+    } catch (err) {
+      console.error("Failed to post comment", err);
     }
   };
 
@@ -149,7 +206,7 @@ export default function HomeScreen() {
     );
   };
 
-  const renderCompletedEvent = ({ item }: { item: Event }) => {
+  const renderPastEvent = ({ item }: { item: Event }) => {
     const profile = item.owner?.profile;
     const rawPhoto = profile?.profile_photo;
     const profilePhotoUri =
@@ -162,11 +219,13 @@ export default function HomeScreen() {
     const alreadyRated = !!(item as any).is_rated;
 
     return (
-      <TouchableOpacity
-        onPress={() => setSelectedEvent(item)}
-        style={[styles.appCardTile, { backgroundColor: "#eee" }]}
-      >
-        <View style={styles.appCardContentTile}>
+      <View style={[styles.appCardTile, { backgroundColor: "#eee" }]}>
+        {/* Glavni pritisak na event ide na detalje */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate("EventDetail", { event: item })}
+          style={styles.appCardContentTile}
+        >
           <Image
             source={
               profilePhotoUri
@@ -188,32 +247,45 @@ export default function HomeScreen() {
             )}
             <Text style={styles.appText}>
               Completed:{" "}
-              {item.ends_at
-                ? new Date(item.ends_at).toLocaleString()
-                : "N/A"}
+              {item.ends_at ? new Date(item.ends_at).toLocaleString() : "N/A"}
             </Text>
+            {typeof item.rating === "number" && (
+              <Text style={styles.appText}>
+                Rating: {item.rating.toFixed(1)} ⭐ ({item.number_of_ratings})
+              </Text>
+            )}
           </View>
-          <TouchableOpacity
-            style={[
-              styles.revokeButton,
-              alreadyRated && { backgroundColor: "#ccc" },
-            ]}
-            disabled={alreadyRated}
-            onPress={() => setRatingEvent(item)}
-          >
-            <Text style={styles.revokeButtonText}>
-              {alreadyRated ? "Already Rated" : "Rate"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+
+        {/* Dugme Rate */}
+        <TouchableOpacity
+          style={[
+            styles.rateButton,
+            alreadyRated && { backgroundColor: "#ccc" },
+          ]}
+          disabled={alreadyRated}
+          onPress={() => setRatingEvent(item)}
+        >
+          <Text style={styles.rateButtonText}>
+            {alreadyRated ? "Already Rated" : "Rate"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Ikonica komentara */}
+        <TouchableOpacity
+          style={styles.commentIcon}
+          onPress={() => openCommentModal(item)}
+        >
+          <Icon name="comment-alt" size={22} color="#00796B" />
+        </TouchableOpacity>
+      </View>
     );
   };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <View style={styles.content}>
-        <Text style={{ fontSize: 20, marginBottom: 12 }}>My Applications</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTitle}>My Applications</Text>
         {loading ? (
           <ActivityIndicator size="large" />
         ) : applications.length === 0 ? (
@@ -223,36 +295,28 @@ export default function HomeScreen() {
             data={applications}
             renderItem={renderApplication}
             keyExtractor={(item) => `app-${item.id}`}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
+            scrollEnabled={false}
           />
         )}
 
-        <View style={{ marginTop: 20 }}>
-          <Text style={{ fontSize: 20, marginBottom: 12 }}>
-            Completed Events
-          </Text>
-          {loading ? (
-            <ActivityIndicator size="large" />
-          ) : completedEvents.length === 0 ? (
-            <Text>No completed events yet.</Text>
-          ) : (
-            <FlatList
-              data={completedEvents}
-              renderItem={renderCompletedEvent}
-              keyExtractor={(item) => `completed-${item.id}`}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              }
-            />
-          )}
-        </View>
-      </View>
+        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+          Completed Events
+        </Text>
+        {loading ? (
+          <ActivityIndicator size="large" />
+        ) : pastEvents.length === 0 ? (
+          <Text>No past events yet.</Text>
+        ) : (
+          <FlatList
+            data={pastEvents}
+            renderItem={renderPastEvent}
+            keyExtractor={(item) => `past-${item.id}`}
+            scrollEnabled={false}
+          />
+        )}
+      </ScrollView>
 
-      {/* Postojeći modal koji pokazuje detalje eventa */}
+      {/* Modal za detalje događaja */}
       <Modal
         visible={!!selectedEvent}
         transparent
@@ -263,49 +327,65 @@ export default function HomeScreen() {
           style={styles.modalBackdrop}
           onPress={() => setSelectedEvent(null)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <Image
-              source={
-                selectedEvent?.owner?.profile?.profile_photo
-                  ? {
-                      uri: selectedEvent.owner.profile.profile_photo.startsWith(
-                        "http"
-                      )
-                        ? selectedEvent.owner.profile.profile_photo
-                        : `${BASE_URL}${selectedEvent.owner.profile.profile_photo}`,
-                    }
-                  : require("../assets/default-avatar.png")
-              }
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                alignSelf: "center",
-                marginBottom: 12,
-              }}
-              resizeMode="cover"
-              onError={() => console.warn("Failed to load avatar")}
-            />
+          <Pressable style={styles.modalContent}>
             <Text style={styles.modalTitle}>{selectedEvent?.title}</Text>
-            <Text style={styles.modalRating}>
-              ⭐{" "}
-              {selectedEvent?.owner?.profile?.rating?.toFixed(1) ?? "N/A"} (
-              {selectedEvent?.owner?.profile?.number_of_ratings ?? 0} ratings)
-            </Text>
             <Text>{selectedEvent?.description || "No description."}</Text>
             <Text style={{ marginTop: 10 }}>
               Location: {selectedEvent?.location}
             </Text>
             <Text>Starts at: {selectedEvent?.starts_at}</Text>
             <Text>Ends at: {selectedEvent?.ends_at}</Text>
-            {selectedEvent?.category && (
-              <Text>
-                Category:{" "}
-                {selectedEvent.category.name.replace(/-/g, " ")}
-              </Text>
-            )}
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Modal za komentare */}
+      <Modal
+        visible={commentModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCommentModal}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Comments for "{commentEvent?.title}"
+            </Text>
+            <ScrollView style={{ maxHeight: 200, marginBottom: 12 }}>
+              {comments.length === 0 && (
+                <Text style={{ fontStyle: "italic", color: "#666" }}>
+                  No comments yet.
+                </Text>
+              )}
+              {comments.map((c) => (
+                <View key={c.id} style={styles.commentBubble}>
+                  <Text style={styles.commentUser}>{c.user.name}</Text>
+                  <Text style={styles.commentText}>{c.content}</Text>
+                  <Text style={styles.commentDate}>
+                    {new Date(c.created_at).toLocaleString()}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={styles.commentInput}
+              value={comment}
+              onChangeText={setComment}
+              multiline
+              placeholder="Write your comment here..."
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={closeCommentModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSubmitButton} onPress={submitComment}>
+                <Text style={styles.modalSubmitText}>Leave a Comment</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Modal za ocenjivanje */}
@@ -318,7 +398,7 @@ export default function HomeScreen() {
             setRatingEvent(null);
             onRefresh();
           }}
-          currentUserId={1} // zameni stvarnim userId ako treba
+          currentUserId={1} // zameni stvarnim ID-jem korisnika
         />
       )}
     </SafeAreaView>
@@ -327,8 +407,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    flex: 1,
     padding: 16,
+    paddingBottom: 60,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    marginBottom: 12,
+    fontWeight: "bold",
   },
   appCardTile: {
     borderRadius: 12,
@@ -339,6 +424,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    backgroundColor: "#fff",
+    position: "relative",
   },
   appCardContentTile: {
     flexDirection: "row",
@@ -382,10 +469,74 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
-  modalRating: {
-    fontSize: 16,
-    color: "gray",
+
+  rateButton: {
+    position: "absolute",
+    top: 10,
+    right: 50,
+    backgroundColor: "#00796B",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  rateButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+
+  commentIcon: {
+    position: "absolute",
+    bottom: 10,
+    right: 12,
+  },
+
+  commentBubble: {
+    backgroundColor: "#f1f1f1",
+    borderRadius: 8,
+    padding: 10,
     marginBottom: 10,
-    textAlign: "center",
+  },
+  commentUser: {
+    fontWeight: "600",
+    color: "#333",
+  },
+  commentText: {
+    marginTop: 4,
+    fontSize: 14,
+    color: "#555",
+  },
+  commentDate: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#888",
+    textAlign: "right",
+  },
+
+  commentInput: {
+    height: 100,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalCancelText: {
+    color: "#999",
+    fontWeight: "600",
+  },
+  modalSubmitButton: {
+    backgroundColor: "#00796B",
+    padding: 10,
+    borderRadius: 6,
+  },
+  modalSubmitText: {
+    color: "white",
+    fontWeight: "600",
   },
 });
