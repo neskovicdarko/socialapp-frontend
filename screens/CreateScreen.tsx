@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import api from "../api";
@@ -34,6 +35,11 @@ export default function CreateScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [startTime, setStartTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const [maxParticipants, setMaxParticipants] = useState<string>("");
+  const [minParticipants, setMinParticipants] = useState<string>("");
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
 
@@ -84,6 +90,27 @@ export default function CreateScreen() {
 
     const startsAt = formatToMysqlDatetime(startDate, startTime);
 
+    const min = minParticipants !== "" ? parseInt(minParticipants) : null;
+    const max = maxParticipants !== "" ? parseInt(maxParticipants) : null;
+
+    if ((min && isNaN(min)) || (max && isNaN(max))) {
+      return Alert.alert("Validation Error", "Participants must be valid numbers.");
+    }
+
+    if (min && (min < 0 || min > 20)) {
+      return Alert.alert("Validation Error", "Minimum must be between 0 and 20.");
+    }
+
+    if (max && (max < 0 || max > 20)) {
+      return Alert.alert("Validation Error", "Maximum must be between 0 and 20.");
+    }
+
+    if (min !== null && max !== null && min > max) {
+      return Alert.alert("Validation Error", "Minimum cannot be greater than maximum.");
+    }
+
+    setIsLoading(true);
+
     try {
       const geo = await Geocoder.from(location);
       if (!geo.results.length) {
@@ -99,12 +126,16 @@ export default function CreateScreen() {
         category_id: categoryId,
         latitude: lat,
         longitude: lng,
+        ...(min !== null && { min_required_participants: min }),
+        ...(max !== null && { max_participants: max }),
       });
 
       Alert.alert("Success", "Event created successfully!");
     } catch (error: any) {
       console.error("Create error:", error);
       Alert.alert("Error", error.response?.data?.message || "Something went wrong.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -140,6 +171,42 @@ export default function CreateScreen() {
           onChangeText={setDescription}
           multiline
         />
+      </View>
+
+      <View style={styles.rowInputs}>
+        <View style={styles.halfInputGroup}>
+          <Text style={styles.label}>Min Participants</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            value={minParticipants}
+            onChangeText={(text) => {
+              if (text === "") return setMinParticipants("");
+              const val = parseInt(text);
+              if (!isNaN(val) && val >= 0 && val <= 20) {
+                setMinParticipants(text);
+              }
+            }}
+            placeholder="0–20"
+          />
+        </View>
+
+        <View style={styles.halfInputGroup}>
+          <Text style={styles.label}>Max Participants</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            value={maxParticipants}
+            onChangeText={(text) => {
+              if (text === "") return setMaxParticipants("");
+              const val = parseInt(text);
+              if (!isNaN(val) && val >= 0 && val <= 20) {
+                setMaxParticipants(text);
+              }
+            }}
+            placeholder="0–20"
+          />
+        </View>
       </View>
 
       <View style={styles.inputGroup}>
@@ -272,9 +339,15 @@ export default function CreateScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleCreate}>
-        <Text style={styles.buttonText}>Create Event</Text>
-      </TouchableOpacity>
+      {isLoading ? (
+        <View style={[styles.button, { backgroundColor: "#ccc" }]}>
+          <ActivityIndicator color="#fff" />
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleCreate}>
+          <Text style={styles.buttonText}>Create Event</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -282,6 +355,15 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, backgroundColor: "#fff" },
   inputGroup: { marginBottom: 12 },
+  rowInputs: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  halfInputGroup: {
+    flex: 1,
+  },
   label: { fontWeight: "600", marginBottom: 4, color: "#333" },
   input: {
     borderWidth: 1,

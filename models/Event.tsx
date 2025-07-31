@@ -18,6 +18,8 @@ export interface Event {
   updated_at?: string;
   owner: User;
   users?: User[];
+  max_participants?: number;
+  min_required_participants?: number;
   pivot?: {
     status: number;
   };
@@ -30,5 +32,5 @@ export interface Event {
     user?: User;
   };
 }
-export type { User };
 
+export type { User };
