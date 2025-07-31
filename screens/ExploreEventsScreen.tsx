@@ -16,6 +16,7 @@ import RNPickerSelect from "react-native-picker-select";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AxiosError } from "axios";
+import Geocoder from "react-native-geocoding";
 
 import api from "../api";
 import { Event } from "../models/Event";
@@ -28,6 +29,8 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Tabs">;
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+Geocoder.init("AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34");
 
 export default function EventScreen() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -47,11 +50,18 @@ export default function EventScreen() {
 
   const [filtersVisible, setFiltersVisible] = useState(false);
 
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState(50);
+  
+  const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
+
   const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
     fetchEvents();
-  }, [query, selectedCategoryId, startsAfter, startsBefore]);
+  }, [query, selectedCategoryId, startsAfter, startsBefore, selectedLocation, radius]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,6 +76,23 @@ export default function EventScreen() {
       setCategories(response.data);
     } catch (err) {
       console.error("Failed to load categories");
+    }
+  };
+
+  const searchLocation = async (text: string) => {
+    setLocationQuery(text);
+    if (text.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+    try {
+      const res = await api.get(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&types=(cities)&key=${GOOGLE_API_KEY}`
+      );
+      const results = res.data.predictions;
+      setLocationSuggestions(results);
+    } catch (err) {
+      setLocationSuggestions([]);
     }
   };
 
@@ -84,6 +111,11 @@ export default function EventScreen() {
       }
       if (startsBefore) {
         params.starts_before = startsBefore.toISOString().split("T")[0];
+      }
+      if (selectedLocation) {
+        params.lat = selectedLocation.lat;
+        params.lng = selectedLocation.lng;
+        params.radius = radius;
       }
 
       const response = await api.get<Event[]>("/events/search", { params });
@@ -158,6 +190,10 @@ export default function EventScreen() {
     setStartsAfter(undefined);
     setStartsBefore(undefined);
     setQuery("");
+    setLocationQuery("");
+    setLocationSuggestions([]);
+    setSelectedLocation(null);
+    setRadius(50);
     setFiltersVisible(false);
   };
 
@@ -171,7 +207,8 @@ export default function EventScreen() {
       !query.trim() &&
       selectedCategoryId === null &&
       !startsAfter &&
-      !startsBefore
+      !startsBefore &&
+      !selectedLocation
     );
   };
 
@@ -234,6 +271,45 @@ export default function EventScreen() {
             style={pickerSelectStyles}
           />
 
+          <TextInput
+            placeholder="Enter location..."
+            value={locationQuery}
+            onChangeText={searchLocation}
+            style={styles.searchInput}
+          />
+
+          {locationSuggestions.length > 0 && (
+            <View style={{ backgroundColor: "#fff", borderRadius: 8, elevation: 2 }}>
+              {locationSuggestions.map((loc, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={async () => {
+                    const detailsRes = await api.get(
+                      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${loc.place_id}&key=${GOOGLE_API_KEY}`
+                    );
+                    const geometry = detailsRes.data.result.geometry.location;
+                    setSelectedLocation({ lat: geometry.lat, lng: geometry.lng });
+                    setLocationQuery(loc.description);
+                    setLocationSuggestions([]);
+                  }}
+                  style={{ padding: 8 }}
+                >
+                  <Text>{loc.description}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+            <Text style={{ marginRight: 8 }}>Radius (km):</Text>
+            <TextInput
+              style={[styles.searchInput, { width: 80 }]}
+              keyboardType="numeric"
+              value={radius.toString()}
+              onChangeText={(text) => setRadius(Number(text))}
+            />
+          </View>
+
           <View style={styles.dateFilterRow}>
             <TouchableOpacity
               style={styles.filterButton}
@@ -256,19 +332,19 @@ export default function EventScreen() {
             <TouchableOpacity
               style={[styles.filterButton, styles.resetButton]}
               onPress={() => {
-                if (isFiltersEmpty()) {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setFiltersVisible(false);
-                } else {
-                  resetFilters();
-                }
+                resetFilters();
               }}
             >
-              <Text style={styles.filterButtonText}>
-                {isFiltersEmpty() ? "Hide" : "Reset"}
-              </Text>
+              <Text style={styles.filterButtonText}>Reset</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={toggleFilters}
+          >
+            <Text style={styles.toggleButtonText}>Hide Filters ▲</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -328,11 +404,11 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   toggleButton: {
-    backgroundColor: "#00796B",
-    paddingVertical: 10,
+    backgroundColor: "#007f6e",
+    padding: 10,
     borderRadius: 8,
+    marginTop: 12,
     alignItems: "center",
-    marginBottom: 8,
   },
   toggleButtonText: {
     color: "#fff",
