@@ -9,12 +9,64 @@ import {
 } from 'react-native';
 import api from '../api';
 import { useLoading } from '../context/LoadingContext';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const { setLoading } = useLoading();
+
+  const validateEmailFormat = (value: string) => {
+    const regex = /^[\w.-]+@[\w.-]+\.\w{2,}$/;
+    return regex.test(value);
+  };
+
+  const validatePasswordFormat = (value: string) => {
+    const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[\W_]).{10,}$/;
+    return regex.test(value);
+  };
+
+  const checkEmailUnique = async () => {
+    if (!email) return;
+    if (!validateEmailFormat(email)) {
+      setEmailError('Invalid email format');
+      return;
+    }
+    try {
+      const res = await api.post('/check-email', { email });
+      if (!res.data.unique) {
+        setEmailError('Email is already taken');
+      } else {
+        setEmailError('');
+      }
+    } catch (err: any) {
+      setEmailError('Could not validate email');
+    }
+  };
+
+  const checkPasswordValid = () => {
+    if (!password) return;
+    if (!validatePasswordFormat(password)) {
+      setPasswordError(
+        'Password must be at least 10 characters, contain a letter, a number and a special character'
+      );
+    } else {
+      setPasswordError('');
+    }
+  };
+
+  const hasErrors = () => {
+    return (
+      !name.trim() ||
+      !!emailError ||
+      !!passwordError ||
+      !validateEmailFormat(email) ||
+      !validatePasswordFormat(password)
+    );
+  };
 
   const register = async () => {
     setLoading(true);
@@ -28,7 +80,10 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert('Success', 'Account created. Please log in.');
       navigation.navigate('Login');
     } catch (err: any) {
-      Alert.alert('Registration failed', err.response?.data?.message || 'Unknown error');
+      Alert.alert(
+        'Registration failed',
+        err.response?.data?.message || 'Unknown error'
+      );
     } finally {
       setLoading(false);
     }
@@ -36,6 +91,23 @@ export default function RegisterScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        borderWidth: 2,
+        borderColor: 'black',
+        alignItems: 'center',
+        overflow: 'hidden',
+        zIndex: 10, // da bude iznad ostalih elemenata
+      }}>
+        <BannerAd
+          unitId={TestIds.BANNER}
+          size={BannerAdSize.ADAPTIVE_BANNER}
+          requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+        />
+      </View>
       <Text style={styles.title}>Join Us 👋</Text>
 
       <View style={styles.inputGroup}>
@@ -51,27 +123,48 @@ export default function RegisterScreen({ navigation }: any) {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Email</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, emailError ? { borderColor: 'red' } : null]}
           placeholder="Enter your email"
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (emailError) setEmailError('');
+          }}
+          onBlur={checkEmailUnique}
         />
+        {emailError ? (
+          <Text style={styles.errorText}>{emailError}</Text>
+        ) : null}
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            passwordError ? { borderColor: 'red' } : null,
+          ]}
           placeholder="Enter your password"
           secureTextEntry
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (passwordError) setPasswordError('');
+          }}
+          onBlur={checkPasswordValid}
         />
+        {passwordError ? (
+          <Text style={styles.errorText}>{passwordError}</Text>
+        ) : null}
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={register}>
+      <TouchableOpacity
+        style={[styles.button, hasErrors() ? { opacity: 0.5 } : null]}
+        onPress={register}
+        disabled={hasErrors()}
+      >
         <Text style={styles.buttonText}>Register</Text>
       </TouchableOpacity>
 
@@ -79,7 +172,9 @@ export default function RegisterScreen({ navigation }: any) {
         style={styles.secondaryButton}
         onPress={() => navigation.navigate('Login')}
       >
-        <Text style={styles.secondaryButtonText}>Already have an account? Login</Text>
+        <Text style={styles.secondaryButtonText}>
+          Already have an account? Login
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -115,6 +210,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#333',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 13,
+    marginTop: 4,
   },
   button: {
     backgroundColor: '#00796B',

@@ -13,7 +13,6 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,9 +23,11 @@ import { Event } from "../models/Event";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import Icon from "react-native-vector-icons/FontAwesome5";
 
-const currentUserId = 1;
+import { BannerAd, BannerAdSize, TestIds } from "react-native-google-mobile-ads";
 
+const currentUserId = 1;
 const SCREEN_WIDTH = Dimensions.get("window").width;
+type EventOrAd = Event | { type: "ad"; id: string };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Tabs">;
 
@@ -86,7 +87,7 @@ export default function MyEventsScreen() {
       const responseJoined = await api.get<Event[]>("/events/joined");
       const allEvents = [...response.data, ...responseJoined.data];
       const uniqueEvents = Array.from(
-        new Map(allEvents.map(event => [event.id, event])).values()
+        new Map(allEvents.map((event) => [event.id, event])).values()
       );
       setEvents(uniqueEvents);
     } catch (err) {
@@ -97,9 +98,7 @@ export default function MyEventsScreen() {
   const fetchPendingCounts = async () => {
     try {
       const response = await api.get("/applications/pending-count");
-      const counts: {
-        [key: number]: { pending: number; accepted: number };
-      } = {};
+      const counts: { [key: number]: { pending: number; accepted: number } } = {};
       response.data.forEach((e: any) => {
         counts[e.id] = {
           pending: e.pending_applications_count,
@@ -152,15 +151,48 @@ export default function MyEventsScreen() {
     return filter === "upcoming" ? startDate > now : startDate <= now;
   });
 
-  const renderItem = ({ item }: { item: Event }) => {
-    const stats = applicationStats[item.id] || { pending: 0, accepted: 0 };
-    const isHost = item.owner_id === currentUserId;
+  // Ubacivanje banera na svaku 4. poziciju samo za past events
+  const eventsWithAds =
+    filter === "past"
+      ? filteredEvents.flatMap((event, index) => {
+        const items: (Event | { type: "ad"; id: string })[] = [event];
+        if ((index + 1) % 3 === 0) {
+          items.push({ type: "ad", id: `ad-${index}` });
+        }
+        return items;
+      })
+      : filteredEvents;
+
+  const renderItem = ({ item }: { item: EventOrAd }) => {
+    if ("type" in item && item.type === "ad") {
+      return (
+        <View
+          style={{
+            marginVertical: 10,
+            alignItems: "center",
+            borderWidth: 1,
+            padding: 4,
+            borderRadius: 8,
+          }}
+        >
+          <BannerAd
+            unitId={TestIds.BANNER}
+            size={BannerAdSize.ADAPTIVE_BANNER}
+            requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+          />
+        </View>
+      );
+    }
+
+    const event = item as Event;
+    const stats = applicationStats[event.id] || { pending: 0, accepted: 0 };
+    const isHost = event.owner_id === currentUserId;
 
     return (
       <View style={styles.eventCard}>
-        <TouchableOpacity onPress={() => navigation.navigate("EventDetail", { event: item })}>
+        <TouchableOpacity onPress={() => navigation.navigate("EventDetail", { event })}>
           <View style={styles.cardHeader}>
-            <Text style={styles.eventTitle}>{item.title}</Text>
+            <Text style={styles.eventTitle}>{event.title}</Text>
             <View style={styles.statsRow}>
               {stats.pending > 0 && (
                 <View style={[styles.badge, { backgroundColor: "red" }]}>
@@ -171,12 +203,12 @@ export default function MyEventsScreen() {
             </View>
           </View>
 
-          <Text style={styles.eventDetail}>{item.starts_at}</Text>
-          <Text style={styles.eventDetail}>{item.location}</Text>
+          <Text style={styles.eventDetail}>{event.starts_at}</Text>
+          <Text style={styles.eventDetail}>{event.location}</Text>
 
-          {item.category && (
+          {event.category && (
             <Text style={styles.eventDetail}>
-              Category: {item.category.name.replace(/-/g, " ")}
+              Category: {event.category.name.replace(/-/g, " ")}
             </Text>
           )}
 
@@ -190,7 +222,7 @@ export default function MyEventsScreen() {
         </TouchableOpacity>
 
         {!isHost && filter === "upcoming" && (
-          <TouchableOpacity onPress={() => revokeParticipation(item.id)} style={styles.revokeButton}>
+          <TouchableOpacity onPress={() => revokeParticipation(event.id)} style={styles.revokeButton}>
             <Text style={styles.revokeButtonText}>Revoke</Text>
           </TouchableOpacity>
         )}
@@ -199,8 +231,8 @@ export default function MyEventsScreen() {
           <TouchableOpacity
             style={styles.commentIcon}
             onPress={() => {
-              setSelectedEvent(item);
-              fetchComments(item.id);
+              setSelectedEvent(event);
+              fetchComments(event.id);
             }}
           >
             <Icon name="comment-alt" size={18} color="#00796B" />
@@ -211,7 +243,13 @@ export default function MyEventsScreen() {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />;
+    return (
+      <ActivityIndicator
+        size="large"
+        color="#00796B"
+        style={{ marginTop: 100 }}
+      />
+    );
   }
 
   return (
@@ -222,33 +260,39 @@ export default function MyEventsScreen() {
             key={key}
             style={[styles.toggleButton, filter === key && styles.selectedToggle]}
             onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              LayoutAnimation.configureNext(
+                LayoutAnimation.Presets.easeInEaseOut
+              );
               setFilter(key as "upcoming" | "past");
             }}
           >
-            <Text style={[styles.toggleText, filter === key && styles.selectedToggleText]}>
+            <Text
+              style={[
+                styles.toggleText,
+                filter === key && styles.selectedToggleText,
+              ]}
+            >
               {key === "upcoming" ? "Upcoming Events" : "Past Events"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />
-      ) : (
-        <FlatList
-          data={filteredEvents}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-        />
-      )}
+      <FlatList<EventOrAd>
+        data={eventsWithAds}
+        renderItem={renderItem}
+        keyExtractor={(item) => "type" in item ? item.id : item.id.toString()}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+
       <Modal visible={!!selectedEvent} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Leave a Comment for "{selectedEvent?.title}"</Text>
+            <Text style={styles.modalTitle}>
+              Leave a Comment for "{selectedEvent?.title}"
+            </Text>
 
             <TextInput
               style={styles.commentInput}
@@ -259,10 +303,12 @@ export default function MyEventsScreen() {
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity onPress={() => {
-                setSelectedEvent(null);
-                setComment("");
-              }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedEvent(null);
+                  setComment("");
+                }}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
 

@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -27,6 +28,14 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- AdMob App ID sa tools:replace -->
+      <meta-data
+          android:name="com.google.android.gms.ads.APPLICATION_ID"
+          android:value="ca-app-pub-3940256099942544~3347511713"
+          tools:replace="android:value"/>
+
+      <!-- Google Maps API Key -->
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34"/>
