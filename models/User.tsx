@@ -7,6 +7,7 @@ export interface Profile {
   number_of_ratings: number;
   profile_photo?: string;
   location?: string;
+  favorite_categories?: number[];
 }
 
 export interface User {
