@@ -17,6 +17,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AxiosError } from "axios";
 import Geocoder from "react-native-geocoding";
+import Icon from "react-native-vector-icons/MaterialIcons";
 
 import api from "../api";
 import { Event } from "../models/Event";
@@ -25,7 +26,6 @@ import { RootStackParamList } from "../navigation/RootNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Tabs">;
 
-// Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -54,6 +54,8 @@ export default function EventScreen() {
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState(50);
+
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   
   const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
 
@@ -61,7 +63,7 @@ export default function EventScreen() {
 
   useEffect(() => {
     fetchEvents();
-  }, [query, selectedCategoryId, startsAfter, startsBefore, selectedLocation, radius]);
+  }, [query, selectedCategoryId, startsAfter, startsBefore, selectedLocation, radius, favoritesOnly]);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,8 +120,14 @@ export default function EventScreen() {
         params.radius = radius;
       }
 
+      if (favoritesOnly) {
+        params.favorites_only = true;
+      } else {
+        delete params.favorites_only;
+      }
+
       const response = await api.get<Event[]>("/events/search", { params });
-      setEvents(response.data);
+      setEvents(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       const error = err as AxiosError;
       console.error("Failed to load events", error);
@@ -194,6 +202,7 @@ export default function EventScreen() {
     setLocationSuggestions([]);
     setSelectedLocation(null);
     setRadius(50);
+    setFavoritesOnly(false);
     setFiltersVisible(false);
   };
 
@@ -202,13 +211,18 @@ export default function EventScreen() {
     setFiltersVisible((prev) => !prev);
   };
 
+  const toggleFavoritesFilter = () => {
+    setFavoritesOnly(!favoritesOnly);
+  };
+
   const isFiltersEmpty = () => {
     return (
       !query.trim() &&
       selectedCategoryId === null &&
       !startsAfter &&
       !startsBefore &&
-      !selectedLocation
+      !selectedLocation &&
+      !favoritesOnly
     );
   };
 
@@ -244,13 +258,26 @@ export default function EventScreen() {
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="Search by title or description..."
-        value={query}
-        onChangeText={setQuery}
-        style={styles.searchInput}
-        placeholderTextColor="#888"
-      />
+      {/* Search bar with favorites star */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          placeholder="Search by title or description..."
+          value={query}
+          onChangeText={setQuery}
+          style={styles.searchInput}
+          placeholderTextColor="#888"
+        />
+        <TouchableOpacity
+          style={[styles.starButton, favoritesOnly && styles.starButtonActive]}
+          onPress={toggleFavoritesFilter}
+        >
+          <Icon 
+            name={favoritesOnly ? "star" : "star-border"} 
+            size={24} 
+            color={favoritesOnly ? "#FFD700" : "#ccc"} 
+          />
+        </TouchableOpacity>
+      </View>
 
       {!filtersVisible && (
         <TouchableOpacity style={styles.toggleButton} onPress={toggleFilters}>
@@ -375,9 +402,9 @@ export default function EventScreen() {
         <ActivityIndicator size="large" color="#00796B" style={{ marginTop: 100 }} />
       ) : (
         <FlatList
-          data={events}
+          data={events.filter(e => e && e.id)}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, idx) => (item && item.id ? item.id.toString() : `event-${idx}`)}
           contentContainerStyle={{ paddingBottom: 20 }}
           refreshing={refreshing}
           onRefresh={onRefresh}
@@ -393,15 +420,32 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   searchInput: {
+    flex: 1,
     height: 44,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 10,
     paddingHorizontal: 14,
-    marginBottom: 12,
     fontSize: 16,
     color: "#333",
+  },
+  starButton: {
+    marginLeft: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#f9f9f9",
+  },
+  starButtonActive: {
+    backgroundColor: "#fff3cd",
+    borderColor: "#FFD700",
   },
   toggleButton: {
     backgroundColor: "#007f6e",
