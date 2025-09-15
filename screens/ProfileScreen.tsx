@@ -12,6 +12,7 @@ import {
 import { launchImageLibrary } from "react-native-image-picker";
 import api from "../api";
 import { User } from "../models/User";
+import { Category } from "../models/Category";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLoading } from "../context/LoadingContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -25,6 +26,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [locationResults, setLocationResults] = useState<any[]>([]);
+  const [favoriteCategories, setFavoriteCategories] = useState<Category[]>([]);
   const { setLoading } = useLoading();
 
   const GOOGLE_API_KEY = "AIzaSyB3h8R8S8DvbZMWSCf1McC4s2hrMUP_l34";
@@ -52,6 +54,7 @@ export default function ProfileScreen({ navigation }: any) {
       const res = await api.get("/profile");
       setUser(res.data);
       setForm(res.data.profile);
+      setFavoriteCategories(res.data.favorite_categories || []);
     } catch (error: any) {
       console.error("Load failed", error.response?.status);
       Alert.alert("Error", `${error}`);
@@ -107,6 +110,7 @@ export default function ProfileScreen({ navigation }: any) {
       const res = await api.patch("/profile", payload);
       setUser(res.data);
       setForm(res.data.profile);
+      setFavoriteCategories(res.data.favorite_categories || []);
       setIsEditing(false);
       setLocationResults([]);
     } catch (error: any) {
@@ -137,6 +141,12 @@ export default function ProfileScreen({ navigation }: any) {
       day: "numeric",
       month: "long",
       year: "numeric",
+    });
+  };
+
+  const navigateToFavoriteCategories = () => {
+    navigation.navigate("SelectFavoriteCategory", {
+      isFirstTime: false,
     });
   };
 
@@ -171,6 +181,33 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={styles.ratingRow}>
             <Text style={styles.ratingText}>{profile.rating?.toFixed(1)} ⭐ ({profile.number_of_ratings})</Text>
           </View>
+        </View>
+
+        {/* Favorite Categories Section */}
+        <View style={styles.favoriteCategoriesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Favorite Categories</Text>
+            <TouchableOpacity onPress={navigateToFavoriteCategories}>
+              <Text style={styles.editLink}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {favoriteCategories.length > 0 ? (
+            <View style={styles.categoriesContainer}>
+              {favoriteCategories.map((category) => (
+                <View key={category.id} style={styles.categoryTag}>
+                  <Text style={styles.categoryTagText}>{category.name.replace(/-/g, " ")}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.noCategoriesContainer}>
+              <Text style={styles.noCategoriesText}>No favorite categories selected</Text>
+              <TouchableOpacity style={styles.addCategoriesButton} onPress={navigateToFavoriteCategories}>
+                <Text style={styles.addCategoriesButtonText}>Add Categories</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {isEditing && (
@@ -302,6 +339,69 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   ratingText: { fontSize: 16, fontWeight: "600", color: "#333" },
+
+  favoriteCategoriesSection: {
+    backgroundColor: "#f8f8f8",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  editLink: {
+    color: "#00796B",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  categoriesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  categoryTag: {
+    backgroundColor: "#e8f5e8",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#00796B",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  categoryTagText: {
+    color: "#00796B",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  noCategoriesContainer: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  noCategoriesText: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 12,
+  },
+  addCategoriesButton: {
+    backgroundColor: "#00796B",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  addCategoriesButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   editSection: { marginTop: 10 },
   inputGroup: { marginBottom: 12 },
   label: { fontWeight: "600", marginBottom: 4, color: "#333" },
