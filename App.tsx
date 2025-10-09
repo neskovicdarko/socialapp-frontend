@@ -6,6 +6,7 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import RootNavigator from './navigation/RootNavigator';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 
 import { LoadingProvider, useLoading } from './context/LoadingContext';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -22,6 +23,11 @@ const AppWrapper = () => {
         <Stack.Navigator initialRouteName="Login">
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen 
+            name="ForgotPassword" 
+            component={ForgotPasswordScreen}
+            options={{ title: 'Forgot Password' }}
+          />
           <Stack.Screen
             name="MainApp"
             component={RootNavigator}

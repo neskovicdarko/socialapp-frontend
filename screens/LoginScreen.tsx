@@ -70,6 +70,10 @@ export default function LoginScreen({ navigation }: any) {
       >
         <Text style={styles.secondaryButtonText}>Don't have an account? Register</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+        <Text style={styles.forgotPassword}>Forgot Password?</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -124,5 +128,12 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#00796B',
     fontWeight: '600',
+  },
+  forgotPassword: {
+    textAlign: 'center',
+    color: '#007bff',
+    fontSize: 16,
+    marginTop: 15,
+    textDecorationLine: 'underline',
   },
 });
