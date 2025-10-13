@@ -63,6 +63,7 @@ export default function EventScreen() {
 
   useEffect(() => {
     fetchEvents();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, selectedCategoryId, startsAfter, startsBefore, selectedLocation, radius, favoritesOnly]);
 
   useFocusEffect(
@@ -215,6 +216,7 @@ export default function EventScreen() {
     setFavoritesOnly(!favoritesOnly);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isFiltersEmpty = () => {
     return (
       !query.trim() &&

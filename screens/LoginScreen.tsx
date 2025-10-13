@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   TextInput,
-  Button,
   Alert,
   StyleSheet,
   Text,
@@ -71,8 +70,11 @@ export default function LoginScreen({ navigation }: any) {
         <Text style={styles.secondaryButtonText}>Don't have an account? Register</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-        <Text style={styles.forgotPassword}>Forgot Password?</Text>
+      <TouchableOpacity 
+        style={styles.secondaryButton}
+        onPress={() => navigation.navigate('ForgotPassword')}
+      >
+        <Text style={styles.secondaryButtonText}>Forgot Password?</Text>
       </TouchableOpacity>
     </View>
   );

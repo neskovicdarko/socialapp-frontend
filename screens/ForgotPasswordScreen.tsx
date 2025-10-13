@@ -1,144 +1,214 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   ActivityIndicator
 } from 'react-native';
+import api from '../api';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
-const ForgotPasswordScreen = ({ navigation }) => {
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+const ForgotPasswordScreen = () => {
+  const [step, setStep] = useState(1); // 1=email, 2=code+password, 3=success
+  const [isError, setIsError] = useState(false);
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const navigation = useNavigation<NavigationProp>();
+  const codeInputs = useRef<Array<TextInput | null>>([]);
 
-  const handleForgotPassword = async () => {
+  const handleSendCode = async () => {
     if (!email) {
-        Alert.alert('Error', 'Please enter your email address');
-        return;
+      setIsError(true);
+      setInfoMessage('Please enter your email');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/forgot-password-code', { email });
+      setStep(2);
+      setIsError(false);
+      setInfoMessage(`Verification code sent to ${email}`);
+    } catch {
+      setIsError(true);
+      setInfoMessage('Something went wrong. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const codeString = code.join('');
+    if (codeString.length < 6 || !password || !passwordConfirmation) {
+      setIsError(true);
+      setInfoMessage('Please fill out all fields');
+      return;
+    }
+
+    if (password !== passwordConfirmation) {
+      setIsError(true);
+      setInfoMessage('Code that is entered is wrong or the passwords do not match!');
+      return;
     }
 
     setLoading(true);
     try {
-            // Use the correct URL - replace with your actual IP if using physical device
-            const response = await fetch('http://10.0.2.2:8000/api/forgot-password', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ email }),
-            });
+      await api.post('/reset-password-code', {
+        email,
+        code: codeString,
+        password,
+        password_confirmation: passwordConfirmation,
+      });
 
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
-            
-            const data = await response.json();
-            console.log('Response data:', data);
+      setIsError(false);
+      setStep(3); // step 3 = success screen
+      setInfoMessage('Password changed successfully!');
+      setEmail('');
+      setCode(['', '', '', '', '', '']);
+      setPassword('');
+      setPasswordConfirmation('');
 
-            if (response.ok) {
-            Alert.alert(
-                'Success',
-                'Password reset link has been sent to your email. Please check your inbox.',
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
-            } else {
-            Alert.alert('Error', data.message || 'Something went wrong');
-            }
-        } catch (error) {
-            console.log('Full error:', error);
-            console.log('Error message:', error.message);
-            Alert.alert('Error', `Network error: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
+      setTimeout(() => navigation.navigate('Login'), 3000);
+    } catch {
+      setIsError(true);
+      setInfoMessage('Code that is entered is wrong or the passwords do not match!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCodeChange = (text: string, index: number) => {
+    if (!/^\d*$/.test(text)) return; // samo cifre
+    const newCode = [...code];
+    newCode[index] = text;
+    setCode(newCode);
+
+    if (text && index < 5) codeInputs.current[index + 1]?.focus();
+    if (!text && index > 0) codeInputs.current[index - 1]?.focus();
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Forgot Password</Text>
-      <Text style={styles.subtitle}>
-        Enter your email address and we'll send you a link to reset your password.
-      </Text>
+      {infoMessage ? (
+        <Text style={[styles.info, isError ? { color: 'red' } : { color: 'green' }]}>
+          {infoMessage}
+        </Text>
+      ) : null}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email Address"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
+      {step === 1 ? (
+        <>
+          <Text style={styles.subtitle}>
+            Enter your email to receive a 6-digit verification code.
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email Address"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSendCode}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Send Code</Text>}
+          </TouchableOpacity>
+        </>
+      ) : step === 2 ? (
+        <>
+          <Text style={styles.subtitle}>
+            Enter the 6-digit code we sent to your email and your new password.
+          </Text>
+          <View style={styles.codeContainer}>
+            {code.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={ref => { codeInputs.current[index] = ref; }}
+                style={styles.codeInput}
+                keyboardType="number-pad"
+                maxLength={1}
+                value={digit}
+                onChangeText={(text) => handleCodeChange(text, index)}
+              />
+            ))}
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="New Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm New Password"
+            value={passwordConfirmation}
+            onChangeText={setPasswordConfirmation}
+            secureTextEntry
+          />
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleResetPassword}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Reset Password</Text>}
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleForgotPassword}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Send Reset Link</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.backToLogin}>Back to Login</Text>
-      </TouchableOpacity>
+          <TouchableOpacity onPress={() => setStep(1)}>
+            <Text style={styles.backToLogin}>Back</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        // step 3 = success screen
+        <View style={styles.successContainer}>
+          <Text style={styles.successText}>✅ {infoMessage}</Text>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-    color: '#666',
-    lineHeight: 22,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
+  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
+  title: { fontSize: 26, fontWeight: '600', textAlign: 'center', marginBottom: 10, color: '#222' },
+  subtitle: { fontSize: 16, textAlign: 'center', marginBottom: 20, color: '#555' },
+  info: { fontSize: 14, textAlign: 'center', marginBottom: 20 },
+  input: { borderWidth: 1, borderColor: '#ccc', padding: 14, borderRadius: 10, fontSize: 16, marginBottom: 20, backgroundColor: '#f9f9f9', color: '#333' },
+  codeContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  codeInput: { borderWidth: 1, borderColor: '#ccc', padding: 14, borderRadius: 10, fontSize: 20, textAlign: 'center', width: 45, backgroundColor: '#f9f9f9', color: '#333' },
+  button: { backgroundColor: '#00796B', padding: 14, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  backToLogin: { textAlign: 'center', color: '#00796B', fontSize: 16, fontWeight: '600' },
+  successContainer: {
+    backgroundColor: '#E6F8EC',
+    borderLeftWidth: 6,
+    borderLeftColor: '#28A745',
+    padding: 14,
     borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 20,
-    backgroundColor: '#f9f9f9',
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  button: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  backToLogin: {
-    textAlign: 'center',
-    color: '#007bff',
+  successText: {
+    color: '#155724',
+    fontWeight: '700',
     fontSize: 16,
   },
 });

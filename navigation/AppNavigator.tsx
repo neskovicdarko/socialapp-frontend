@@ -1,19 +1,20 @@
-import React, { useEffect, useRef } from "react";
+/* eslint-disable react/no-unstable-nested-components */
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   TouchableOpacity,
   StyleSheet,
   Platform,
   Animated,
-} from "react-native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import Icon from "react-native-vector-icons/Ionicons";
+} from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Icon from 'react-native-vector-icons/Ionicons';
 
-import HomeScreen from "../screens/HomeScreen";
-import MapScreen from "../screens/MapScreen";
-import CreateScreen from "../screens/CreateScreen";
-import ChatEventListScreen from "../screens/ChatEventListScreen";
-import EventsTabs from "../screens/EventsTabs";
+import HomeScreen from '../screens/HomeScreen';
+import MapScreen from '../screens/MapScreen';
+import CreateScreen from '../screens/CreateScreen';
+import ChatEventListScreen from '../screens/ChatEventListScreen';
+import EventsTabs from '../screens/EventsTabs';
 
 const Tab = createBottomTabNavigator();
 
@@ -30,8 +31,8 @@ function AnimatedTabIcon({
   name,
   focused,
   size = 24,
-  activeColor = "#004D40",
-  inactiveColor = "#00796B",
+  activeColor = '#004D40',
+  inactiveColor = '#00796B',
 }: AnimatedTabIconProps){
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -83,32 +84,32 @@ export default function AppNavigator({ navigation }: any) {
 
         const getIcon = () => {
           switch (routeName) {
-            case "Home":
-              return "home-outline";
-            case "Map":
-              return "map-outline";
-            case "Events":
-              return "calendar-outline";
-            case "Chat":
-              return "chatbubbles-outline";
-            case "Create":
-              return "add";
+            case 'Home':
+              return 'home-outline';
+            case 'Map':
+              return 'map-outline';
+            case 'Events':
+              return 'calendar-outline';
+            case 'Chat':
+              return 'chatbubbles-outline';
+            case 'Create':
+              return 'add';
             default:
-              return "ellipse-outline";
+              return 'ellipse-outline';
           }
         };
 
         return {
           tabBarShowLabel: false,
           tabBarStyle: {
-            height: Platform.OS === "ios" ? 90 : 60,
+            height: Platform.OS === 'ios' ? 90 : 60,
             borderTopLeftRadius: 20,
             borderTopRightRadius: 20,
-            position: "absolute",
+            position: 'absolute',
           },
           tabBarIcon: ({ focused }) => {
             const iconName = getIcon();
-            const isCreate = routeName === "Create";
+            const isCreate = routeName === 'Create';
 
             if (isCreate) {
               return <AnimatedCreateTabIcon focused={focused} />;
@@ -121,7 +122,7 @@ export default function AppNavigator({ navigation }: any) {
           headerRight: () => (
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate("ProfileStack", { screen: "ProfileMain" })
+                navigation.navigate('ProfileStack', { screen: 'ProfileMain' })
               }
               style={{ marginRight: 16 }}
             >
@@ -142,15 +143,15 @@ export default function AppNavigator({ navigation }: any) {
 
 const styles = StyleSheet.create({
   createButton: {
-    backgroundColor: "#00796B",
+    backgroundColor: '#00796B',
     width: 50,
     height: 50,
     borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Platform.OS === "ios" ? 20 : 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Platform.OS === 'ios' ? 20 : 10,
     elevation: 3,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
